@@ -2,6 +2,7 @@ http = require 'http'
 url = require 'url'
 extend = require('util')._extend
 ip = require 'ip'
+q = require 'q'
 
 
 INTERNALPORT = 8081
@@ -13,7 +14,7 @@ class ServerMessage extends http.Server
 
   constructor: (requestListener) ->
     method = 'ServerMessage.constructor'
-    @logger.info "#{methodName}"
+    @logger.info "#{method}"
 
     # Dictionary of dynamic reply channels, indexed by httpSep-iid.
     @dynReplyChannels = {}
@@ -27,7 +28,7 @@ class ServerMessage extends http.Server
 
 
   listen: (@channel, cb) ->
-    console.log "ServerMessage.listen channel=#{@channel.name}, \
+    @logger.info "ServerMessage.listen channel=#{@channel.name}, \
                  internalport=#{INTERNALPORT}"
     @runtime = @channel.runtimeAgent
     @iid = @runtime.config.iid
@@ -50,8 +51,8 @@ class ServerMessage extends http.Server
   # a dynamic reply channel for proccess http requests.
   #
   _handleStaticRequest: (message) =>
-    methodName = 'ServerMessage:_handleStaticRequest'
-    @logger.info "#{methodName} message received #{message.toString()}"
+    method = 'ServerMessage:_handleStaticRequest'
+    @logger.info "#{method} message received #{message.toString()}"
     return q.promise (resolve, reject) =>
       try
         request = JSON.parse message
@@ -62,13 +63,13 @@ class ServerMessage extends http.Server
             channel.handleRequest = @_handleHttpRequest
             @_setChannelTimeout(channel, @currentTimeout)
             @dynReplyChannels[iid] = channel
-          @logger.info "#{methodName} resolve dynReplyChannel=\
+          @logger.info "#{method} resolve dynReplyChannel=\
                         #{@dynReplyChannels[iid].name}"
           resolve [[JSON.stringify(request)],[@dynReplyChannels[iid]]]
         else
           throw new Error 'Invalid request type'
       catch e
-        @logger.error "#{methodName} catch error = #{e.message}"
+        @logger.error "#{method} catch error = #{e.message}"
         @emit 'error', e
         reject(e)
 
@@ -77,8 +78,8 @@ class ServerMessage extends http.Server
   # http request, send to target, and wait (promise) response
   #
   _handleHttpRequest: (message) =>
-    methodName = 'ServerMessage:_handleHttpRequest'
-    @logger.debug "#{methodName} message received"
+    method = 'ServerMessage:_handleHttpRequest'
+    @logger.debug "#{method} message received"
     return q.promise (resolve, reject) =>
       try
         message = Array.apply null, message
@@ -89,8 +90,8 @@ class ServerMessage extends http.Server
         proxyReq = http.request options
 
         proxyReq.on 'error', (err) =>
-          @logger.error "#{methodName} onError error = #{err.message}"
-          @emit 'error', err
+          @logger.error "#{method} onError error = #{err.message}"
+          @emit 'error', err.stack
           reject(err)
 
         proxyReq.on 'response', (proxyRes) =>
@@ -101,7 +102,7 @@ class ServerMessage extends http.Server
           proxyReq.write slapRequestData
         proxyReq.end()
       catch e
-        @logger.error "#{methodName} catch error = #{e.message}"
+        @logger.error "#{method} catch error = #{e.message}"
         @emit 'error', e
         reject(e)
 
@@ -110,8 +111,8 @@ class ServerMessage extends http.Server
   # Extract relevant info from response, "package" it, and return via promise
   #
   _onHttpResponse: (instancespath, response, resolve) ->
-    methodName = 'ServerMessage:_onHttpResponse'
-    @logger.debug "#{methodName} message received"
+    method = 'ServerMessage:_onHttpResponse'
+    @logger.debug "#{method} message received"
 
     # For development debug: special header "instancespath"
     if instancespath? then response.headers.instancespath = instancespath
