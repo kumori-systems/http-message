@@ -57,7 +57,7 @@ describe 'http-message test', ->
     slaputils.setLoggerOwner 'http-message'
     logger = slaputils.getLogger 'http-message'
     logger.configure {
-      'console-log' : true
+      'console-log' : false
       'console-level' : 'debug'
       'colorize': true
       'file-log' : false
