@@ -78,6 +78,7 @@ class ServerMessage extends http.Server
   # http request, send to target, and wait (promise) response
   #
   _handleHttpRequest: (message) =>
+    @logger.info "============================================================"
     method = 'ServerMessage:_handleHttpRequest'
     @logger.debug "#{method} message received"
     return q.promise (resolve, reject) =>
@@ -87,7 +88,22 @@ class ServerMessage extends http.Server
         slapRequestData = message[1] ? null # payload of request
 
         options = @_getOptionsRequest slapRequest
+        @logger.debug "#{method} options = #{JSON.stringify options}"
         proxyReq = http.request options
+
+        proxyReq.on 'socket', (socket) =>
+          socket.juanjo = "holaradiola"
+          socket.on 'connect', () =>
+            @logger.info "#{method} onSocketConnect socket = #{socket.localAddress}:#{socket.localPort}"
+          socket.on 'data', () =>
+            @logger.info "#{method} onSocketData socket = #{socket.localAddress}:#{socket.localPort}"
+          socket.on 'end', () =>
+            @logger.info "#{method} onSocketEnd = #{socket.localAddress}:#{socket.localPort}"
+          socket.on 'timeout', () =>
+            @logger.info "#{method} onSocketTimeout = #{socket.localAddress}:#{socket.localPort}"
+          socket.on 'close', () =>
+            @logger.info "#{method} onSocketClose = #{socket.localAddress}:#{socket.localPort}"
+
 
         proxyReq.on 'error', (err) =>
           @logger.error "#{method} onError error = (ver siguiente línea)"
@@ -102,7 +118,8 @@ class ServerMessage extends http.Server
         if slapRequestData?
           slapRequestData = new Buffer slapRequestData
           @logger.debug "#{method} Invocando proxyReq.write()"
-          proxyReq.write slapRequestData
+          proxyReq.write slapRequestData, () =>
+            @logger.debug "#{method} proxyReq.write() callback"
 
         @logger.debug "#{method} Invocando proxyReq.end()"
         proxyReq.end()
@@ -120,6 +137,10 @@ class ServerMessage extends http.Server
   _onHttpResponse: (instancespath, response, resolve) ->
     method = 'ServerMessage:_onHttpResponse'
     @logger.debug "#{method} message received"
+
+    socket = response.socket
+    if socket.juanjo? then  @logger.info "#{method} response.socket = socketjuanjo"
+    @logger.info "#{method} response.socket = #{socket.localAddress}:#{socket.localPort}"
 
     # For development debug: special header "instancespath"
     if instancespath? then response.headers.instancespath = instancespath
