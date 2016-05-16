@@ -90,19 +90,26 @@ class ServerMessage extends http.Server
         proxyReq = http.request options
 
         proxyReq.on 'error', (err) =>
-          @logger.error "#{method} onError error = #{err.message}"
-          @emit 'error', err.stack
+          @logger.error "#{method} onError error = (ver siguiente línea)"
+          @logger.error "#{method} onError error = #{err.stack}"
+          @emit 'error', err
           reject(err)
 
         proxyReq.on 'response', (proxyRes) =>
+          @logger.debug "#{method} onResponse"
           @_onHttpResponse options.headers.instancespath, proxyRes, resolve
 
         if slapRequestData?
           slapRequestData = new Buffer slapRequestData
+          @logger.debug "#{method} Invocando proxyReq.write()"
           proxyReq.write slapRequestData
+
+        @logger.debug "#{method} Invocando proxyReq.end()"
         proxyReq.end()
+
       catch e
-        @logger.error "#{method} catch error = #{e.message}"
+        @logger.error "#{method} catch error = (ver siguiente línea)"
+        @logger.error "#{method} catch error = #{e.stack}"
         @emit 'error', e
         reject(e)
 
@@ -122,20 +129,25 @@ class ServerMessage extends http.Server
       statusCode: response.statusCode
     slapResponseData = null
 
-    response.on 'data', (chunk) ->
+    response.on 'data', (chunk) =>
+      @logger.debug "#{method} onData"
       if slapResponseData is null then slapResponseData = []
       slapResponseData.push chunk
 
-    response.on 'end', () ->
+    response.on 'end', () =>
+      @logger.debug "#{method} onEnd"
       if slapResponseData isnt null
+        @logger.debug "#{method} Buffer.concat data"
         slapResponseData = Buffer.concat(slapResponseData)
       aux = [JSON.stringify(slapResponse)]
       if slapResponseData? then aux.push slapResponseData
+      @logger.debug "#{method} resolving promise"
       resolve [aux]
 
-    response.on 'error', () =>
-      @logger.info textError
-      @emit 'error', new Error(textError)
+    response.on 'error', (err) =>
+      @logger.error "#{method} onError error = (ver siguiente línea)"
+      @logger.error "#{method} onError error = #{err.stack}"
+      @emit 'error', err
 
 
   # Create "option" param that http.request constructor needs
