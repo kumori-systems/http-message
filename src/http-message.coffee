@@ -52,7 +52,7 @@ class ServerMessage extends http.Server
   #
   _handleStaticRequest: (message) =>
     method = 'ServerMessage:_handleStaticRequest'
-    @logger.info "#{method} message received #{message.toString()}"
+    @logger.debug "#{method} message received #{message.toString()}"
     return q.promise (resolve, reject) =>
       try
         request = JSON.parse message
@@ -63,14 +63,13 @@ class ServerMessage extends http.Server
             channel.handleRequest = @_handleHttpRequest
             @_setChannelTimeout(channel, @currentTimeout)
             @dynReplyChannels[iid] = channel
-          @logger.info "#{method} resolve dynReplyChannel=\
+          @logger.debug "#{method} resolve dynReplyChannel=\
                         #{@dynReplyChannels[iid].name}"
           resolve [[JSON.stringify(request)],[@dynReplyChannels[iid]]]
         else
           throw new Error 'Invalid request type'
       catch e
         @logger.error "#{method} catch error = #{e.message}"
-        @emit 'error', e
         reject(e)
 
 
@@ -78,9 +77,8 @@ class ServerMessage extends http.Server
   # http request, send to target, and wait (promise) response
   #
   _handleHttpRequest: (message) =>
-    @logger.info "============================================================"
     method = 'ServerMessage:_handleHttpRequest'
-    @logger.debug "#{method} message received"
+    @logger.info "#{method} request message received"
     return q.promise (resolve, reject) =>
       try
         message = Array.apply null, message
@@ -88,59 +86,33 @@ class ServerMessage extends http.Server
         slapRequestData = message[1] ? null # payload of request
 
         options = @_getOptionsRequest slapRequest
-        @logger.debug "#{method} options = #{JSON.stringify options}"
         proxyReq = http.request options
 
-        proxyReq.on 'socket', (socket) =>
-          socket.juanjo = "holaradiola"
-          socket.on 'connect', () =>
-            @logger.info "#{method} onSocketConnect socket = #{socket.localAddress}:#{socket.localPort}"
-          socket.on 'data', () =>
-            @logger.info "#{method} onSocketData socket = #{socket.localAddress}:#{socket.localPort}"
-          socket.on 'end', () =>
-            @logger.info "#{method} onSocketEnd = #{socket.localAddress}:#{socket.localPort}"
-          socket.on 'timeout', () =>
-            @logger.info "#{method} onSocketTimeout = #{socket.localAddress}:#{socket.localPort}"
-          socket.on 'close', () =>
-            @logger.info "#{method} onSocketClose = #{socket.localAddress}:#{socket.localPort}"
-
-
         proxyReq.on 'error', (err) =>
-          @logger.error "#{method} onError error = (ver siguiente línea)"
           @logger.error "#{method} onError error = #{err.stack}"
-          @emit 'error', err
-          reject(err)
+          reject err
 
         proxyReq.on 'response', (proxyRes) =>
-          @logger.debug "#{method} onResponse"
-          @_onHttpResponse options.headers.instancespath, proxyRes, resolve
+          @_onHttpResponse options.headers.instancespath, proxyRes, \
+                           resolve, reject
 
         if slapRequestData?
           slapRequestData = new Buffer slapRequestData
-          @logger.debug "#{method} Invocando proxyReq.write()"
-          proxyReq.write slapRequestData, () =>
-            @logger.debug "#{method} proxyReq.write() callback"
+          proxyReq.write slapRequestData
 
-        @logger.debug "#{method} Invocando proxyReq.end()"
         proxyReq.end()
 
       catch e
-        @logger.error "#{method} catch error = (ver siguiente línea)"
         @logger.error "#{method} catch error = #{e.stack}"
-        @emit 'error', e
-        reject(e)
+        reject e
 
 
   # Process a http response
   # Extract relevant info from response, "package" it, and return via promise
   #
-  _onHttpResponse: (instancespath, response, resolve) ->
+  _onHttpResponse: (instancespath, response, resolve, reject) ->
     method = 'ServerMessage:_onHttpResponse'
-    @logger.debug "#{method} message received"
-
-    socket = response.socket
-    if socket.juanjo? then  @logger.info "#{method} response.socket = socketjuanjo"
-    @logger.info "#{method} response.socket = #{socket.localAddress}:#{socket.localPort}"
+    @logger.info "#{method} response received"
 
     # For development debug: special header "instancespath"
     if instancespath? then response.headers.instancespath = instancespath
@@ -151,24 +123,19 @@ class ServerMessage extends http.Server
     slapResponseData = null
 
     response.on 'data', (chunk) =>
-      @logger.debug "#{method} onData"
       if slapResponseData is null then slapResponseData = []
       slapResponseData.push chunk
 
     response.on 'end', () =>
-      @logger.debug "#{method} onEnd"
       if slapResponseData isnt null
-        @logger.debug "#{method} Buffer.concat data"
         slapResponseData = Buffer.concat(slapResponseData)
       aux = [JSON.stringify(slapResponse)]
       if slapResponseData? then aux.push slapResponseData
-      @logger.debug "#{method} resolving promise"
       resolve [aux]
 
     response.on 'error', (err) =>
-      @logger.error "#{method} onError error = (ver siguiente línea)"
       @logger.error "#{method} onError error = #{err.stack}"
-      @emit 'error', err
+      reject err
 
 
   # Create "option" param that http.request constructor needs

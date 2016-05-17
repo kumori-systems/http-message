@@ -57,7 +57,7 @@ describe 'http-message test', ->
     slaputils.setLoggerOwner 'http-message'
     logger = slaputils.getLogger 'http-message'
     logger.configure {
-      'console-log' : false
+      'console-log' : true
       'console-level' : 'debug'
       'colorize': true
       'file-log' : false
@@ -179,11 +179,63 @@ describe 'http-message test', ->
         res.setHeader('content-type', 'text/plain')
         res.write EXPECTED_REPLY
         res.end()
-    httpMessageServer.setTimeout 500, () ->
-      done()
+    httpMessageServer.setTimeout 500
     dynReplyChannel.handleRequest([
       JSON.stringify(createSlapRequest('GET')),
       null
     ])
     .then (reply) ->
       done new Error 'Timeout expected'
+    .fail (err) ->
+      err.message.should.be.eql 'socket hang up'
+      done()
+
+
+  it 'Interleave a correct request and a timeout request', (done) ->
+    httpMessageServer.on 'request', (req, res) ->
+      data = ''
+      req.on 'data', (chunk) ->
+        data += chunk
+      req.on 'end', () ->
+        if data is 'normal request' then sleep = 200
+        else if data is 'timeout request' then sleep = 500
+        else done Error "Invalid test request type: #{data}"
+        q.delay(sleep)
+        .then () ->
+          res.statusCode = 200
+          res.setHeader('content-type', 'text/plain')
+          res.write EXPECTED_REPLY
+          res.end()
+    httpMessageServer.setTimeout 500
+
+    doneCount = 0
+
+    dynReplyChannel.handleRequest([
+      JSON.stringify(createSlapRequest('POST')),
+      'timeout request'
+    ])
+    .then (reply) ->
+      done new Error "Expected timeout fail"
+    .fail (err) ->
+      doneCount++
+
+    setTimeout () ->
+      dynReplyChannel.handleRequest([
+        JSON.stringify(createSlapRequest('POST')),
+        'normal request'
+      ])
+      .then (reply) ->
+        data = reply[0][1].toString()
+        data.should.be.eql EXPECTED_REPLY
+        doneCount++
+      .fail (err) ->
+        done err
+    , 400
+
+    setTimeout () ->
+      if doneCount is 2 then done()
+      else done new Error "Some request fail!"
+    , 1000
+
+
+
