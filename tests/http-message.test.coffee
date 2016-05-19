@@ -57,7 +57,7 @@ describe 'http-message test', ->
     slaputils.setLoggerOwner 'http-message'
     logger = slaputils.getLogger 'http-message'
     logger.configure {
-      'console-log' : true
+      'console-log' : false
       'console-level' : 'debug'
       'colorize': true
       'file-log' : false
@@ -198,7 +198,7 @@ describe 'http-message test', ->
         data += chunk
       req.on 'end', () ->
         if data is 'normal request' then sleep = 200
-        else if data is 'timeout request' then sleep = 500
+        else if data is 'timeout request' then sleep = 600
         else done Error "Invalid test request type: #{data}"
         q.delay(sleep)
         .then () ->
