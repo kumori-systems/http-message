@@ -16,15 +16,16 @@ class ServerMessage extends http.Server
     method = 'ServerMessage.constructor'
     @logger.info "#{method}"
     @dynChannels = {} # Dictionary of dynamic channels, by Sep-iid
-    @requests = {}
+    @requests = {} # http requests in process
     @target = url.parse("http://localhost:#{INTERNALPORT}")
     @currentTimeout = DEFAULT_CHANNEL_TIMEOUT
     super requestListener
 
 
   listen: (@channel, cb) ->
-    @logger.info "ServerMessage.listen channel=#{@channel.name}, \
-                 internalport=#{INTERNALPORT}"
+    method = 'ServerMessage.listen'
+    @logger.info "#{method} channel=#{@channel.name}, \
+                  internalport=#{INTERNALPORT}"
     @runtime = @channel.runtimeAgent
     @iid = @runtime.config.iid
     @channel.handleRequest = @_handleStaticRequest
@@ -32,6 +33,8 @@ class ServerMessage extends http.Server
 
 
   close: (cb) ->
+    method = 'ServerMessage.close'
+    @logger.info "#{method}"
     @channel.handleRequest = null
     super cb
 
@@ -42,67 +45,74 @@ class ServerMessage extends http.Server
     super msecs, cb
 
 
-  _handleStaticRequest: (message) =>
+  _handleStaticRequest: ([request], [dynRequestChannel]) =>
     method = 'ServerMessage:_handleStaticRequest'
-    @logger.info "#{method} message received #{message.toString()}"
+    @logger.debug "#{method} message received"
     return q.promise (resolve, reject) =>
       try
-        request = JSON.parse message[0]
-        dynRequestChannel = message[1]
-        iid = request.from
+        @logger.debug "#{method} request = #{request.toString()}"
+        request = JSON.parse request.toString()
         if request.type is 'getDynChannel'
-          if @dynChannels[request.fromInstance]? # Shoudn't happen!
-            @logger.warn "#{method} getDynChannel will be replaced"
-          dynReplyChannel = @runtime.createChannel()
-          dynReplyChannel.handleRequest = @_handleHttpRequest
-          @_setChannelTimeout(dynReplyChannel, @currentTimeout)
-          @dynChannels[request.fromInstance] = {
-            reply: dynReplyChannel
-            request: dynRequestChannel
-          }
-          @logger.info "#{method} dynReplyChannel=#{dynReplyChannel.name},\
+          if @dynChannels[request.fromInstance]?
+            dynReplyChannel = @dynChannels[request.fromInstance].reply
+            created = false
+          else
+            dynReplyChannel = @runtime.createChannel()
+            dynReplyChannel.handleRequest = @_handleHttpRequest
+            @_setChannelTimeout(dynReplyChannel, @currentTimeout)
+            @dynChannels[request.fromInstance] = {
+              reply: dynReplyChannel
+              request: dynRequestChannel
+            }
+            created = true
+          @logger.debug "#{method} created=#{created} \
+                        dynReplyChannel=#{dynReplyChannel.name},\
                         dynRequestChannel=#{dynRequestChannel.name}"
-          resolve [['ACK'],[dynReplyChannel]]
+          resolve [[@iid],[dynReplyChannel]]
         else
           throw new Error 'Invalid request type'
       catch e
         @logger.error "#{method} catch error = #{e.message}"
-        @emit 'error', e
         reject(e)
 
 
-  _handleHttpRequest: (message) =>
+  _handleHttpRequest: ([message, data]) =>
     method = 'ServerMessage:_handleHttpRequest'
     @logger.debug "#{method} message received"
     return q.promise (resolve, reject) =>
       try
-        message = JSON.parse(message[0])
+        message = JSON.parse message
+        reqId = message.reqId
         switch message.type
-
           when 'request'
             options = @_getOptionsRequest message.data
             request = http.request options
-            @requests[message.reqId] = request
+            @requests[reqId] = request
+
             request.on 'error', (err) =>
               @logger.warn "#{method} onError #{err.stack}"
-              @emit 'error', err
-              if @requests[message.reqId]? delete @requests[message.reqId]
+              @_processHttpResponseError message, err
+
             request.on 'response', (response) =>
-              if @requests[message.reqId]?
-                instancespath = options.headers.instancespath # debug purposes
-                @_onHttpResponse response, message, instancespath
+              if @requests[reqId]?
+                # For development debug: special header "instancespath"
+                instancespath = options.headers.instancespath
+                if instancespath?
+                  response.headers.instancespath = instancespath
+                @_processHttpResponse response, message
               else
-                @logger.warn "#{method}:response request #{message.reqId} not found"
+                @logger.warn "#{method} onResponse request #{reqId} \
+                              not found"
 
           when 'data'
-            request = @requests[message.reqId]
-            if request? then request.write message.data
-            else throw new Error "Request #{message.reqId} not found"
+            request = @requests[reqId]
+            if request? then request.write data
+            else throw new Error "Request #{reqId} not found"
 
           when 'end'
-            request = @requests[message.reqId]
+            request = @requests[reqId]
             if request? then request.end()
-            else throw new Error "Request #{message.reqId} not found"
+            else throw new Error "Request #{reqId} not found"
 
           else
             throw new Error "Invalid message type: #{message.type}"
@@ -110,65 +120,79 @@ class ServerMessage extends http.Server
         resolve [['ACK']]
       catch e
         @logger.warn "#{method} catch error = #{e.message}"
-        @emit 'error', e
         reject(e)
 
 
-  _onHttpResponse: (response, requestMessage, instancespath) ->
-    method = 'ServerMessage:_onHttpResponse'
-    @logger.debug "#{method}"
+  _processHttpResponseError: (requestMessage, err) ->
+    method = 'ServerMessage:_processHttpResponseError'
+    @logger.debug "#{method} #{JSON.stringify requestMessage}"
 
-    # For development debug: special header "instancespath"
-    if instancespath?
-      response.headers.instancespath = instancespath
-
-    dynRequestChanel = @dynChannels[requestMessage.fromInstance]
+    reqId = requestMessage.reqId
+    dynRequestChannel = @dynChannels[requestMessage.fromInstance].request
     if dynRequestChannel?
-      responseMessage = _createMessage(requestMessage)
-      dynRequest.sendRequest JSON.stringify responseMessage
-      .then () =>
-        slapStatus = value[0][0]
-        if slapStatus.status isnt 'OK'
-          @logger.error "#{method} status = #{JSON.stringify slapStatus}"
-      .fail (err) =>
-        @logger.error "#{method} #{err.stack}"
+
+      responseMessage = _createMessage('error', null, requestMessage)
+      @_sendMessage(dynRequestChannel, [JSON.stringify(responseMessage), \
+                                        err.message])
+      if @requests[reqId]? then delete @requests[reqId]
+
     else
       @logger.warn "#{method} dynRequestChannel not found for iid = \
                     #{requestMessage.fromInstance}"
 
-    ----------------
 
-    response.on 'data', (chunk) ->
-      if slapResponseData is null then slapResponseData = []
-      slapResponseData.push chunk
+  _processHttpResponse: (response, requestMessage) ->
+    method = 'ServerMessage:_processHttpResponse'
+    @logger.debug "#{method} #{JSON.stringify requestMessage}"
 
-    response.on 'end', () ->
-      if slapResponseData isnt null
-        slapResponseData = Buffer.concat(slapResponseData)
-      aux = [JSON.stringify(slapResponse)]
-      if slapResponseData? then aux.push slapResponseData
-      resolve [aux]
-      if @requests[message.reqId]? delete @requests[message.reqId]
+    reqId = requestMessage.reqId
+    dynRequestChannel = @dynChannels[requestMessage.fromInstance].request
+    if dynRequestChannel?
 
-    response.on 'error', () =>
-      @logger.info textError
-      @emit 'error', new Error(textError)
+      responseMessage = _createMessage('response', response, requestMessage)
+      @_sendMessage(dynRequestChannel, [JSON.stringify(responseMessage)])
+
+      response.on 'data', (chunk) =>
+        responseMessage = _createMessage('data', response, requestMessage)
+        @_sendMessage(dynRequestChannel, [JSON.stringify(responseMessage), \
+                                          chunk])
+
+      response.on 'end', () =>
+        responseMessage = _createMessage('end', response, requestMessage)
+        @_sendMessage(dynRequestChannel, [JSON.stringify(responseMessage)])
+        if @requests[reqId]? then delete @requests[reqId]
+
+      response.on 'error', (err) =>
+        @logger.warn "#{method} onError #{err.stack}"
+        if @requests[reqId]? then delete @requests[reqId]
+
+    else
+      @logger.warn "#{method} dynRequestChannel not found for iid = \
+                    #{requestMessage.fromInstance}"
 
 
-  _createMessage = (requestMessage, data) ->
-    type = requestMessage.type
-    if type is 'request'
-      type = 'response'
-      data =
-        headers: response.headers
-        statusCode: response.statusCode
-    return {
+  _createMessage = (type, response, requestMessage) ->
+    message = {
       type: type
-      domain: domain
-      connKey: connKey
-      reqId: reqId
-      data: data
+      domain: requestMessage.domain
+      connKey: requestMessage.connKey
+      reqId: requestMessage.reqId
     }
+    if type is 'response'
+      message.headers = response.headers
+      message.statusCode = response.statusCode
+    return message
+
+
+  _sendMessage: (channel, message) ->
+    channel.sendRequest message
+    .then () ->
+      slapStatus = value[0][0]
+      if slapStatus.status isnt 'OK'
+        throw new Error "status = #{JSON.stringify slapStatus}"
+    .fail (err) =>
+      @logger.error "#{method} message.type = #{message.type} \
+                     err = #{err.stack}"
 
 
   _getOptionsRequest: (request) ->
@@ -178,13 +202,14 @@ class ServerMessage extends http.Server
     if (@target.hostname != undefined) then options.hostname = @target.hostname
     options.method = request.method
     options.headers = extend({}, request.headers)
-    if (options.method is 'DELETE' or \ # Copied from http-proxy
+    if (options.method is 'DELETE' or \ # Copied r http-proxy
        options.method is 'OPTIONS') and \
        (not options.headers['content-length'])
       options.headers['content-length'] = '0'
     if options.headers.instancespath? # For development debug
       options.headers.instancespath = "#{options.headers.instancespath},\
                                        iid=#{@iid}"
+    options.headers['connection'] = 'keep-alive'
     options.path = url.parse(request.url).path
     return options
 
