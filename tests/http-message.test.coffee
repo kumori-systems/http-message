@@ -17,8 +17,8 @@ class Reply extends EventEmitter
       config: {
         iid: iid
       },
-      createChannel: () =>
-        return new Reply("#{@name}_#{Reply.dynCount++}", iid)
+      createChannel: () ->
+        return new Reply("dyn_rep_#{Reply.dynCount++}", iid)
     }
 
   setConfig: () ->
@@ -26,29 +26,42 @@ class Reply extends EventEmitter
   handleRequest: () -> throw new Error 'NOT IMPLEMENTED'
 
 #-------------------------------------------------------------------------------
+class Request extends EventEmitter
+
+  constructor: (@name, iid) ->
+    @sentMessages = []
+    @config = {}
+    @runtimeAgent = {
+      config: {
+        iid: iid
+      }
+    }
+
+  sendRequest: (message) ->
+    @sentMessages.push message
+    return q.promise (resolve, reject) ->
+      resolve [{status: 'OK'}]
+      reject 'NOT IMPLEMENTED'
+
+  setConfig: () ->
+
+  resetSentMesages: () -> @sentMessages = []
+
+  getLastSentMessage: () -> return @sentMessages.pop()
+
+#-------------------------------------------------------------------------------
 
 logger = null
 httpMessageServer = null
 replyChannel = null
 dynReplyChannel = null
+dynRequestChannel = null
+SEP_IID = 'SEP1'
 IID = 'A1'
+CONNKEY = '123456'
 EXPECTED_REPLY = 'Hello'
 EXPECTED_PAYLOAD = 'More data'
-
-createSlapRequest = (method, use_instancespath) ->
-  req =
-    connectionKey: "123456",
-    domain: ''
-    protocol: 'http'
-    origin: '127.0.0.1'
-    httpversion: '1.1'
-    url: '/'
-    method: method
-    headers:
-      host:"localhost:8080",
-      connection:"keep-alive"
-  if use_instancespath? then req.headers.instancespath = ''
-  return req
+reqIdCount = 1
 
 
 describe 'http-message test', ->
@@ -70,7 +83,8 @@ describe 'http-message test', ->
     httpMessageServer = http.createServer()
     httpMessageServer.on 'error', (err) ->
       @logger.warn "httpMessageServer.on error = #{err.message}"
-    replyChannel = new Reply('main_channel', IID)
+    replyChannel = new Reply('main_rep_channel', IID)
+    dynRequestChannel = new Request('dyn_req', IID)
     done()
 
 
@@ -87,9 +101,9 @@ describe 'http-message test', ->
   it 'Send an invalid request', (done) ->
     request = JSON.stringify {
       type: 'XXX'
-      from: IID
+      fromInstance: IID
     }
-    replyChannel.handleRequest(request)
+    replyChannel.handleRequest([request], [dynRequestChannel])
     .then (message) ->
       done new Error 'Expected <invalid request type> error'
     .fail (err) ->
@@ -99,14 +113,15 @@ describe 'http-message test', ->
   it 'Establish dynamic channel', (done) ->
     request = JSON.stringify {
       type: 'getDynChannel'
-      from: IID
+      fromInstance: SEP_IID
     }
-    replyChannel.handleRequest(request)
+    replyChannel.handleRequest([request], [dynRequestChannel])
     .then (message) ->
       reply = message[0][0] # when test, we dont receive a "status" segment
-      reply.should.be.eql request
+      reply.should.be.eql IID
       dynReplyChannel = message[1][0]
       dynReplyChannel.constructor.name.should.be.eql 'Reply'
+      dynReplyChannel.name.should.be.eql 'dyn_rep_0'
       done()
     .fail (err) ->
       done err
@@ -118,13 +133,31 @@ describe 'http-message test', ->
       res.setHeader('content-type', 'text/plain')
       res.write EXPECTED_REPLY
       res.end()
-    dynReplyChannel.handleRequest([
-      JSON.stringify(createSlapRequest('GET')),
-      null
-    ])
-    .then (reply) ->
-      data = reply[0][1].toString()
-      data.should.be.eql EXPECTED_REPLY
+    dynRequestChannel.resetSentMesages()
+    reqId = "#{reqIdCount++}"
+    m1 = _createMessage 'request', reqId, 'get', true
+    dynReplyChannel.handleRequest [m1]
+    .then () ->
+      m2 = _createMessage 'end', reqId
+      dynReplyChannel.handleRequest [m2]
+    .then () ->
+      q.delay(100)
+    .then () ->
+      r3 = dynRequestChannel.getLastSentMessage()
+      r3 = JSON.parse r3
+      [r2, r2data] = dynRequestChannel.getLastSentMessage()
+      r2 = JSON.parse r2
+      r2data = r2data.toString()
+      r1 = dynRequestChannel.getLastSentMessage()
+      r1 = JSON.parse r1
+      r1.type.should.be.eql 'response'
+      r1.reqId.should.be.eql reqId
+      r1.headers.instancespath.should.be.eql ",iid=#{IID}"
+      r2.type.should.be.eql 'data'
+      r2.reqId.should.be.eql reqId
+      r2data.should.be.eql EXPECTED_REPLY
+      r3.type.should.be.eql 'end'
+      r3.reqId.should.be.eql reqId
       done()
 
 
@@ -139,36 +172,33 @@ describe 'http-message test', ->
         res.setHeader('content-type', 'text/plain')
         res.write EXPECTED_REPLY
         res.end()
-
-    dynReplyChannel.handleRequest([
-      JSON.stringify(createSlapRequest('POST')),
-      EXPECTED_PAYLOAD
-    ])
-    .then (reply) ->
-      data = reply[0][1].toString()
-      data.should.be.eql EXPECTED_REPLY
+    reqId = "#{reqIdCount++}"
+    m1 = _createMessage 'request', reqId, 'post'
+    dynReplyChannel.handleRequest [m1]
+    .then () ->
+      m2 = _createMessage 'data', reqId
+      dynReplyChannel.handleRequest [m2, EXPECTED_PAYLOAD]
+    .then () ->
+      m3 = _createMessage 'end', reqId
+      dynReplyChannel.handleRequest [m3]
+    .then () ->
+      q.delay(100)
+    .then () ->
+      r3 = dynRequestChannel.getLastSentMessage()
+      r3 = JSON.parse r3
+      [r2, r2data] = dynRequestChannel.getLastSentMessage()
+      r2 = JSON.parse r2
+      r2data = r2data.toString()
+      r1 = dynRequestChannel.getLastSentMessage()
+      r1 = JSON.parse r1
+      r1.type.should.be.eql 'response'
+      r1.reqId.should.be.eql reqId
+      r2.type.should.be.eql 'data'
+      r2.reqId.should.be.eql reqId
+      r2data.should.be.eql EXPECTED_REPLY
+      r3.type.should.be.eql 'end'
+      r3.reqId.should.be.eql reqId
       done()
-
-
-  it 'Process a with instancespath header', (done) ->
-    httpMessageServer.once 'request', (req, res) ->
-      res.statusCode = 200
-      res.setHeader('content-type', 'text/plain')
-      res.write EXPECTED_REPLY
-      res.end()
-    dynReplyChannel.handleRequest([
-      JSON.stringify(createSlapRequest('GET', true)),
-      null
-    ])
-    .then (reply) ->
-      headers = JSON.parse(reply[0][0]).headers
-      if not headers.instancespath?
-        done new Error 'header instancespath expected'
-      else
-        headers.instancespath.should.be.eql ',iid=A1'
-        data = reply[0][1].toString()
-        data.should.be.eql EXPECTED_REPLY
-        done()
 
 
   it 'Fail a request because timeout', (done) ->
@@ -179,15 +209,19 @@ describe 'http-message test', ->
         res.setHeader('content-type', 'text/plain')
         res.write EXPECTED_REPLY
         res.end()
+    dynRequestChannel.resetSentMesages()
     httpMessageServer.setTimeout 500
-    dynReplyChannel.handleRequest([
-      JSON.stringify(createSlapRequest('GET')),
-      null
-    ])
-    .then (reply) ->
-      done new Error 'Timeout expected'
-    .fail (err) ->
-      err.message.should.be.eql 'socket hang up'
+    reqId = "#{reqIdCount++}"
+    m1 = _createMessage 'request', reqId, 'get', true
+    dynReplyChannel.handleRequest [m1]
+    .then () ->
+      m2 = _createMessage 'end', reqId
+      dynReplyChannel.handleRequest [m2]
+    .then () ->
+      q.delay(1000)
+    .then () ->
+      last = dynRequestChannel.getLastSentMessage()[0]
+      JSON.parse(last).type.should.be.eql 'error'
       done()
 
 
@@ -208,34 +242,59 @@ describe 'http-message test', ->
           res.end()
     httpMessageServer.setTimeout 500
 
-    doneCount = 0
+    dynRequestChannel.resetSentMesages()
 
-    dynReplyChannel.handleRequest([
-      JSON.stringify(createSlapRequest('POST')),
-      'timeout request'
-    ])
-    .then (reply) ->
-      done new Error "Expected timeout fail"
+    reqId = "#{reqIdCount++}"
+    m1 = _createMessage 'request', reqId, 'post'
+    dynReplyChannel.handleRequest [m1]
+    .then () ->
+      m2 = _createMessage 'data', reqId
+      dynReplyChannel.handleRequest [m2, 'timeout request']
+    .then () ->
+      m3 = _createMessage 'end', reqId
+      dynReplyChannel.handleRequest [m3]
     .fail (err) ->
-      doneCount++
+      done err
 
     setTimeout () ->
-      dynReplyChannel.handleRequest([
-        JSON.stringify(createSlapRequest('POST')),
-        'normal request'
-      ])
-      .then (reply) ->
-        data = reply[0][1].toString()
-        data.should.be.eql EXPECTED_REPLY
-        doneCount++
+      reqId = "#{reqIdCount++}"
+      m1 = _createMessage 'request', reqId, 'post'
+      dynReplyChannel.handleRequest [m1]
+      .then () ->
+        m2 = _createMessage 'data', reqId
+        dynReplyChannel.handleRequest [m2, 'normal request']
+      .then () ->
+        m3 = _createMessage 'end', reqId
+        dynReplyChannel.handleRequest [m3]
       .fail (err) ->
         done err
     , 400
 
     setTimeout () ->
-      if doneCount is 2 then done()
-      else done new Error "Some request fail!"
+      next = () -> return JSON.parse(dynRequestChannel.getLastSentMessage()[0])
+      next().type.should.be.eql 'end'
+      next().type.should.be.eql 'data'
+      next().type.should.be.eql 'response'
+      next().type.should.be.eql 'error'
+      done()
     , 1000
 
 
-
+  _createMessage = (type, reqId, method, use_instancespath) ->
+    if type is 'request'
+      requestData =
+        protocol: 'http'
+        url: '/'
+        method: method
+        headers:
+          host:"localhost:8080",
+          connection:"keep-alive"
+      if use_instancespath? then requestData.headers.instancespath = ''
+    return JSON.stringify {
+      type: type
+      domain: 'uno.empresa.es'
+      fromInstance: SEP_IID
+      connKey: CONNKEY
+      reqId: reqId
+      data: requestData
+    }
