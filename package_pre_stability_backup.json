@@ -21,7 +21,7 @@
     "coffee-script": "1.10.0",
     "ip": "1.0.2",
     "q": "1.4.1",
-    "slaputils":"git+ssh://git@gitlab.iti.upv.es:iti_kumori_paas/slap-utils.git#STABILITY"
+    "slaputils":"git+ssh://git@gitlab.iti.upv.es:iti_kumori_paas/slap-utils.git#master"
   },
   "devDependencies": {
     "coffee-coverage": "1.0.1",
