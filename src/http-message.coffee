@@ -3,33 +3,41 @@ url = require 'url'
 extend = require('util')._extend
 ip = require 'ip'
 q = require 'q'
+tcpPortUsed = require 'tcp-port-used'
 
+# Provisional. Ticket461
+MIN_INTERNAL_PORT = 8000
+MAX_INTERNAL_PORT = 9000
 
-INTERNALPORT = 8081
 DEFAULT_CHANNEL_TIMEOUT = 3600000 # 1 hour
 
 
 class ServerMessage extends http.Server
 
+  used_internal_ports: [] # class variable, shared between objects
 
   constructor: (requestListener) ->
     method = 'ServerMessage.constructor'
     @logger.info "#{method}"
     @dynChannels = {} # Dictionary of dynamic channels, by Sep-iid
     @requests = {} # http requests in process
-    @target = url.parse("http://localhost:#{INTERNALPORT}")
+    @target = null
     @currentTimeout = DEFAULT_CHANNEL_TIMEOUT
     super requestListener
 
 
   listen: (@channel, cb) ->
     method = 'ServerMessage.listen'
-    @logger.info "#{method} channel=#{@channel.name}, \
-                  internalport=#{INTERNALPORT}"
+    @logger.info "#{method} channel=#{@channel.name}"
     @runtime = @channel.runtimeAgent
     @iid = @runtime.config.iid
     @channel.handleRequest = @_handleStaticRequest
-    super INTERNALPORT, cb
+    @_getInternalPort(MIN_INTERNAL_PORT, MAX_INTERNAL_PORT)
+    .then (internalport) =>
+      @target = url.parse("http://localhost:#{internalport}")
+      super internalport, cb
+    .fail (err) ->
+      cb err
 
 
   close: (cb) ->
@@ -221,6 +229,26 @@ class ServerMessage extends http.Server
     if cfg.timeout isnt msecs
       cfg.timeout = msecs
       channel.setConfig cfg
+
+
+  _getInternalPort: (minPort, maxPort) ->
+    q()
+    .then () =>
+      if @used_internal_ports.indexOf(minPort) < 0 then q.resolve()
+      else q.reject()
+    .then () ->
+      tcpPortUsed.check minPort, "127.0.0.1"
+    .then (inUse) ->
+      if inUse then q.reject new Error()
+    .then () =>
+      @used_internal_ports.push minPort
+      return minPort
+    .fail (err) =>
+      minPort++
+      if minPort <= maxPort
+        @_getInternalPort minPort, maxPort
+      else
+        q.reject new Error 'Internal port not available'
 
 
 module.exports = ServerMessage
