@@ -34,6 +34,7 @@ class ServerMessage extends http.Server
     @channel.handleRequest = @_handleStaticRequest
     @_getInternalPort(MIN_INTERNAL_PORT, MAX_INTERNAL_PORT)
     .then (internalport) =>
+      @logger.info "#{method} internalport=#{internalport}"
       @target = url.parse("http://localhost:#{internalport}")
       super internalport, cb
     .fail (err) ->
