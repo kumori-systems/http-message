@@ -112,21 +112,22 @@ class ServerMessage extends http.Server
               else
                 @logger.warn "#{method} onResponse request #{reqId} \
                               not found"
+            resolve [['ACK']]
 
           when 'data'
             request = @requests[reqId]
-            if request? then request.write data
+            if request? then request.write data, () -> resolve [['ACK']]
             else throw new Error "Request #{reqId} not found"
 
           when 'end'
             request = @requests[reqId]
             if request? then request.end()
             else throw new Error "Request #{reqId} not found"
+            resolve [['ACK']]
 
           else
             throw new Error "Invalid message type: #{message.type}"
 
-        resolve [['ACK']]
       catch e
         @logger.warn "#{method} catch error = #{e.message}"
         reject(e)
