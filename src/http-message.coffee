@@ -195,6 +195,7 @@ class ServerMessage extends http.Server
 
 
   _sendMessage: (channel, message) ->
+    method = 'ServerMessage:_sendMessage'
     channel.sendRequest message
     .then () ->
       slapStatus = value[0][0]
