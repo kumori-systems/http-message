@@ -197,10 +197,6 @@ class ServerMessage extends http.Server
   _sendMessage: (channel, message) ->
     method = 'ServerMessage:_sendMessage'
     channel.sendRequest message
-    .then () ->
-      slapStatus = value[0][0]
-      if slapStatus.status isnt 'OK'
-        throw new Error "status = #{JSON.stringify slapStatus}"
     .fail (err) =>
       @logger.error "#{method} message.type = #{message.type} \
                      err = #{err.stack}"
