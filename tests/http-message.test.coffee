@@ -99,21 +99,6 @@ describe 'http-message test', ->
     httpMessageServer.on 'listening', () -> done()
 
 
-  it 'Listen when a port is busy', (done) ->
-    # port 8000 used by httpMessageServer
-    # port 8001 used by netServer
-    # port 8002 must be selected by httpMessageServer2
-    netServer = net.createServer()
-    netServer.listen 8001, () ->
-      httpMessageServer2 = http.createServer()
-      httpMessageServer2.listen new Reply('temporal', 'temporal')
-      httpMessageServer2.on 'listening', () ->
-        httpMessageServer2.target.port.should.be.eql '8002'
-        httpMessageServer2.close()
-        netServer.close()
-        done()
-
-
   it 'Send an invalid request', (done) ->
     request = JSON.stringify {
       type: 'XXX'
