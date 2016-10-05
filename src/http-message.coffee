@@ -23,7 +23,6 @@ class ServerMessage extends http.Server
     @requests = {} # http requests in process
     @requests = {} # http requests in process, by reqId
     @websockets = {} # websocket connections in process, by original reqId
-    @agent = new http.Agent {keepAlive: true} #JJJ
     @currentTimeout = DEFAULT_CHANNEL_TIMEOUT
     super requestListener
 
@@ -65,7 +64,7 @@ class ServerMessage extends http.Server
 
   _handleStaticRequest: ([request], [dynRequestChannel]) =>
     method = 'ServerMessage:_handleStaticRequest'
-    @logger.debug "#{method} message received"
+    @logger.debug "#{method}"
     return q.promise (resolve, reject) =>
       try
         @logger.debug "#{method} request = #{request.toString()}"
@@ -100,10 +99,11 @@ class ServerMessage extends http.Server
   _handleHttpRequest: ([message, data]) =>
     reqId = message.reqId
     method = "ServerMessage:_handleHttpRequest reqId=#{reqId}"
-    @logger.debug "#{method} message received"
+    @logger.debug "#{method}"
     return q.promise (resolve, reject) =>
       try
         switch message.type
+
           when 'request'
             options = @_getOptionsRequest message.data
             request = http.request options
@@ -121,15 +121,18 @@ class ServerMessage extends http.Server
               else
                 @logger.warn "#{method} onResponse request not found"
             resolve [['ACK']]
+
           when 'data'
             request = @requests[reqId]
             if request? then request.write data, () -> resolve [['ACK']]
             else throw new Error "Request not found"
+
           when 'end'
             request = @requests[reqId]
             if request? then request.end()
             else throw new Error "Request not found"
             resolve [['ACK']]
+
           else
             throw new Error "Invalid message type: #{message.type}"
       catch e
@@ -138,24 +141,30 @@ class ServerMessage extends http.Server
 
 
   _processHttpResponse: (response, requestMessage) ->
-    method = 'ServerMessage:_processHttpResponse'
-    @logger.debug "#{method} #{JSON.stringify requestMessage}"
     reqId = requestMessage.reqId
+    method = "ServerMessage:_processHttpResponse reqId = #{reqId}"
+    @logger.debug "#{method}"
+
     dynRequestChannel = @dynChannels[requestMessage.fromInstance].request
     if dynRequestChannel?
+
       responseMessage = @_createHttpMessage('response', response, requestMessage)
       @_sendMessage(dynRequestChannel, [JSON.stringify(responseMessage)])
+
       response.on 'data', (chunk) =>
         responseMessage = @_createHttpMessage('data', response, requestMessage)
         @_sendMessage(dynRequestChannel, [JSON.stringify(responseMessage), \
                                           chunk])
+
       response.on 'end', () =>
         responseMessage = @_createHttpMessage('end', response, requestMessage)
         @_sendMessage(dynRequestChannel, [JSON.stringify(responseMessage)])
         if @requests[reqId]? then delete @requests[reqId]
+
       response.on 'error', (err) =>
         @logger.warn "#{method} onError #{err.stack}"
         if @requests[reqId]? then delete @requests[reqId]
+
     else
       @logger.warn "#{method} dynRequestChannel not found for iid = \
                     #{requestMessage.fromInstance}"
@@ -164,21 +173,25 @@ class ServerMessage extends http.Server
   _handleWS: ([message, data]) =>
     reqId = message.reqId
     method = "ServerMessage:_handleWS reqId = #{reqId}"
-    @logger.debug "#{method} message received"
+    @logger.debug "#{method}"
     return q.promise (resolve, reject) =>
       try
         switch message.type
+
           when 'upgrade'
             @_processUpgrade message, resolve, reject
+
           when 'data'
             socket = @websockets[reqId]
             if not socket? then throw new Error "WS request not found"
             socket.write data, () -> resolve [['ACK']]
+
           when 'end'
             socket = @websockets[reqId]
             if not socket? then throw new Error "WS request not found"
             socket.end()
             resolve [['ACK']]
+
           else
             throw new Error "Invalid message type: #{message.type}"
       catch e
@@ -190,33 +203,47 @@ class ServerMessage extends http.Server
     reqId = message.reqId
     connKey = message.connKey
     method = "ServerMessage:_processUpgrade reqId = #{reqId}"
-    @logger.debug "#{method} message received"
-    options = @_getOptionsRequest message.data
-    request = http.request options
-    request.on 'error', (err) =>
-      @logger.error "#{method} onError #{err.message}"
-      responseMessage = @_createWsMessage('upgrade', connKey, reqId, err.message)
-      @_sendMessage(dynRequestChannel, [JSON.stringify(responseMessage)])
-    request.on 'response', (response) =>
-      err = 'resonse event unexpected'
-      @logger.error "#{method} onError #{err}"
-      responseMessage = @_createWsMessage('upgrade', connKey, reqId, err)
-      @_sendMessage(dynRequestChannel, [JSON.stringify(responseMessage)])
-    request.on 'upgrade', (response, socket, head) =>
-      @logger.debug "#{method} upgrade received"
-      responseMessage = @_createWsMessage('upgrade', connKey, reqId)
-      ack = @_createWsUpgradeAck(response)
-      @_sendMessage(dynRequestChannel, [JSON.stringify(responseMessage), ack])
-      @websockets[reqId] = socket
-      if @requests[reqId]? then delete @requests[reqId]
-      socket.on 'data', (chunk) =>
-        message = @_createWsMessage('data', connKey, reqId)
-        @_sendMessage(dynRequestChannel, [JSON.stringify(message), chunk])
-      socket.on 'close', () =>
-        delete @websockets[reqId]
-        message = @_createWsMessage('end', connKey, reqId)
-        @_sendMessage(dynRequestChannel, [JSON.stringify(message)])
-    request.end()
+    @logger.debug "#{method}"
+    dynRequestChannel = @dynChannels[message.fromInstance].request
+    if dynRequestChannel?
+
+      options = @_getOptionsRequest message.data
+      request = http.request options
+
+      request.on 'error', (err) =>
+        @logger.error "#{method} onError #{err.message}"
+        responseMessage = @_createWsMessage('upgrade', connKey, reqId, err.message)
+        @_sendMessage(dynRequestChannel, [JSON.stringify(responseMessage)])
+
+      request.on 'response', (response) =>
+        err = 'resonse event unexpected'
+        @logger.error "#{method} onError #{err}"
+        responseMessage = @_createWsMessage('upgrade', connKey, reqId, err)
+        @_sendMessage(dynRequestChannel, [JSON.stringify(responseMessage)])
+
+      request.on 'upgrade', (response, socket, head) =>
+        @logger.debug "#{method} upgrade received"
+        responseMessage = @_createWsMessage('upgrade', connKey, reqId)
+        ack = @_createWsUpgradeAck(response)
+        @_sendMessage(dynRequestChannel, [JSON.stringify(responseMessage), ack])
+        @websockets[reqId] = socket
+        if @requests[reqId]? then delete @requests[reqId]
+        socket.on 'data', (chunk) =>
+          message = @_createWsMessage('data', connKey, reqId)
+          @_sendMessage(dynRequestChannel, [JSON.stringify(message), chunk])
+        socket.on 'close', () =>
+          delete @websockets[reqId]
+          message = @_createWsMessage('end', connKey, reqId)
+          @_sendMessage(dynRequestChannel, [JSON.stringify(message)])
+
+      request.end()
+      resolve [['ACK']]
+
+    else
+      text = "dynRequestChannel not found for iid = \
+              #{requestMessage.fromInstance}"
+      @logger.warn "#{method} #{text}"
+      reject new Error text
 
 
   _processHttpResponseError: (requestMessage, err) ->
