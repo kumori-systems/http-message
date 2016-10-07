@@ -172,7 +172,7 @@ class ServerMessage extends http.Server
 
   _handleWS: ([message, data]) =>
     reqId = message.reqId
-    method = "ServerMessage:_handleWS reqId = #{reqId}"
+    method = "ServerMessage:_handleWS reqId = #{reqId} type = #{message?.type}"
     @logger.debug "#{method}"
     return q.promise (resolve, reject) =>
       try
