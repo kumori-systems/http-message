@@ -296,7 +296,8 @@ class ServerMessage extends http.Server
 
 
   _sendMessage: (channel, message) ->
-    method = "ServerMessage:_sendMessage reqId=#{reqId} type=#{message?.type}"
+    method = "ServerMessage:_sendMessage reqId=#{message?.reqId} \
+              type=#{message?.type}"
     @logger.debug "#{method}"
 
     channel.sendRequest message
