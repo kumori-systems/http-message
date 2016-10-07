@@ -142,7 +142,7 @@ class ServerMessage extends http.Server
 
   _processHttpResponse: (response, requestMessage) ->
     reqId = requestMessage.reqId
-    method = "ServerMessage:_processHttpResponse reqId = #{reqId}"
+    method = "ServerMessage:_processHttpResponse reqId=#{reqId}"
     @logger.debug "#{method}"
 
     dynRequestChannel = @dynChannels[requestMessage.fromInstance].request
@@ -172,7 +172,7 @@ class ServerMessage extends http.Server
 
   _handleWS: ([message, data]) =>
     reqId = message.reqId
-    method = "ServerMessage:_handleWS reqId = #{reqId} type = #{message?.type}"
+    method = "ServerMessage:_handleWS reqId=#{reqId} type=#{message?.type}"
     @logger.debug "#{method}"
     return q.promise (resolve, reject) =>
       try
@@ -202,7 +202,7 @@ class ServerMessage extends http.Server
   _processUpgrade: (message, resolve, reject) ->
     reqId = message.reqId
     connKey = message.connKey
-    method = "ServerMessage:_processUpgrade reqId = #{reqId}"
+    method = "ServerMessage:_processUpgrade reqId=#{reqId}"
     @logger.debug "#{method}"
     dynRequestChannel = @dynChannels[message.fromInstance].request
     if dynRequestChannel?
@@ -296,10 +296,12 @@ class ServerMessage extends http.Server
 
 
   _sendMessage: (channel, message) ->
-    method = 'ServerMessage:_sendMessage'
+    method = "ServerMessage:_sendMessage reqId=#{reqId} type=#{message?.type}"
+    @logger.debug "#{method}"
+
     channel.sendRequest message
     .fail (err) =>
-      @logger.error "#{method} message.type = #{message.type} \
+      @logger.error "#{method} message.type=#{message.type} \
                      err = #{err.stack}"
 
 
