@@ -149,16 +149,15 @@ class ServerMessage extends http.Server
     if dynRequestChannel?
 
       responseMessage = @_createHttpMessage('response', response, requestMessage)
-      @_sendMessage(dynRequestChannel, [JSON.stringify(responseMessage)])
+      @_sendMessage(dynRequestChannel, responseMessage)
 
       response.on 'data', (chunk) =>
         responseMessage = @_createHttpMessage('data', response, requestMessage)
-        @_sendMessage(dynRequestChannel, [JSON.stringify(responseMessage), \
-                                          chunk])
+        @_sendMessage(dynRequestChannel, responseMessage, chunk)
 
       response.on 'end', () =>
         responseMessage = @_createHttpMessage('end', response, requestMessage)
-        @_sendMessage(dynRequestChannel, [JSON.stringify(responseMessage)])
+        @_sendMessage(dynRequestChannel, responseMessage)
         if @requests[reqId]? then delete @requests[reqId]
 
       response.on 'error', (err) =>
@@ -213,28 +212,28 @@ class ServerMessage extends http.Server
       request.on 'error', (err) =>
         @logger.error "#{method} onError #{err.message}"
         responseMessage = @_createWsMessage('upgrade', connKey, reqId, err.message)
-        @_sendMessage(dynRequestChannel, [JSON.stringify(responseMessage)])
+        @_sendMessage(dynRequestChannel, responseMessage)
 
       request.on 'response', (response) =>
         err = 'resonse event unexpected'
         @logger.error "#{method} onError #{err}"
         responseMessage = @_createWsMessage('upgrade', connKey, reqId, err)
-        @_sendMessage(dynRequestChannel, [JSON.stringify(responseMessage)])
+        @_sendMessage(dynRequestChannel, responseMessage)
 
       request.on 'upgrade', (response, socket, head) =>
         @logger.debug "#{method} upgrade received"
         responseMessage = @_createWsMessage('upgrade', connKey, reqId)
         ack = @_createWsUpgradeAck(response)
-        @_sendMessage(dynRequestChannel, [JSON.stringify(responseMessage), ack])
+        @_sendMessage(dynRequestChannel, responseMessage, ack)
         @websockets[reqId] = socket
         if @requests[reqId]? then delete @requests[reqId]
         socket.on 'data', (chunk) =>
           message = @_createWsMessage('data', connKey, reqId)
-          @_sendMessage(dynRequestChannel, [JSON.stringify(message), chunk])
+          @_sendMessage(dynRequestChannel, message, chunk)
         socket.on 'close', () =>
           delete @websockets[reqId]
           message = @_createWsMessage('end', connKey, reqId)
-          @_sendMessage(dynRequestChannel, [JSON.stringify(message)])
+          @_sendMessage(dynRequestChannel, message)
 
       request.end()
       resolve [['ACK']]
@@ -253,8 +252,7 @@ class ServerMessage extends http.Server
     dynRequestChannel = @dynChannels[requestMessage.fromInstance].request
     if dynRequestChannel?
       responseMessage = @_createHttpMessage('error', null, requestMessage)
-      @_sendMessage(dynRequestChannel, [JSON.stringify(responseMessage), \
-                                        err.message])
+      @_sendMessage(dynRequestChannel, responseMessage, err.message)
       if @requests[reqId]? then delete @requests[reqId]
     else
       @logger.warn "#{method} dynRequestChannel not found for iid = \
@@ -295,12 +293,13 @@ class ServerMessage extends http.Server
     return ack
 
 
-  _sendMessage: (channel, message) ->
+  _sendMessage: (channel, message, data) ->
     method = "ServerMessage:_sendMessage reqId=#{message?.reqId} \
               type=#{message?.type}"
     @logger.debug "#{method}"
-
-    channel.sendRequest message
+    aux = [JSON.stringify message]
+    if data? then aux.push data
+    channel.sendRequest aux
     .fail (err) =>
       @logger.error "#{method} message.type=#{message.type} \
                      err = #{err.stack}"
