@@ -1,10 +1,12 @@
 http = require '../src/index'
+#httpnode = require 'http'
 q = require 'q'
 net = require 'net'
 EventEmitter = require('events').EventEmitter
 slaputils = require 'slaputils'
 should = require 'should'
 supertest = require 'supertest'
+WebSocketServer = require('websocket').server
 
 
 #-------------------------------------------------------------------------------
@@ -54,6 +56,7 @@ class Request extends EventEmitter
 
 logger = null
 httpMessageServer = null
+wsServer = null
 replyChannel = null
 dynReplyChannel = null
 dynRequestChannel = null
@@ -66,6 +69,7 @@ reqIdCount = 1
 
 
 describe 'http-message test', ->
+
 
   before (done) ->
     slaputils.setLoggerOwner 'http-message'
@@ -90,28 +94,14 @@ describe 'http-message test', ->
 
 
   after (done) ->
-    httpMessageServer.close()
+    if httpMessageServer? then httpMessageServer.close()
+    if wsServer? then wsServer.shutDown()
     done()
 
 
   it 'Listen', (done) ->
     httpMessageServer.listen replyChannel
     httpMessageServer.on 'listening', () -> done()
-
-
-  it 'Listen when a port is busy', (done) ->
-    # port 8000 used by httpMessageServer
-    # port 8001 used by netServer
-    # port 8002 must be selected by httpMessageServer2
-    netServer = net.createServer()
-    netServer.listen 8001, () ->
-      httpMessageServer2 = http.createServer()
-      httpMessageServer2.listen new Reply('temporal', 'temporal')
-      httpMessageServer2.on 'listening', () ->
-        httpMessageServer2.target.port.should.be.eql '8002'
-        httpMessageServer2.close()
-        netServer.close()
-        done()
 
 
   it 'Send an invalid request', (done) ->
@@ -151,10 +141,10 @@ describe 'http-message test', ->
       res.end()
     dynRequestChannel.resetSentMesages()
     reqId = "#{reqIdCount++}"
-    m1 = _createMessage 'request', reqId, 'get', true
+    m1 = _createMessage 'http', 'request', reqId, 'get', true
     dynReplyChannel.handleRequest [m1]
     .then () ->
-      m2 = _createMessage 'end', reqId
+      m2 = _createMessage 'http', 'end', reqId
       dynReplyChannel.handleRequest [m2]
     .then () ->
       q.delay(100)
@@ -189,13 +179,13 @@ describe 'http-message test', ->
         res.write EXPECTED_REPLY
         res.end()
     reqId = "#{reqIdCount++}"
-    m1 = _createMessage 'request', reqId, 'post'
+    m1 = _createMessage 'http', 'request', reqId, 'post'
     dynReplyChannel.handleRequest [m1]
     .then () ->
-      m2 = _createMessage 'data', reqId
+      m2 = _createMessage 'http', 'data', reqId
       dynReplyChannel.handleRequest [m2, EXPECTED_PAYLOAD]
     .then () ->
-      m3 = _createMessage 'end', reqId
+      m3 = _createMessage 'http', 'end', reqId
       dynReplyChannel.handleRequest [m3]
     .then () ->
       q.delay(100)
@@ -228,10 +218,10 @@ describe 'http-message test', ->
     dynRequestChannel.resetSentMesages()
     httpMessageServer.setTimeout 500
     reqId = "#{reqIdCount++}"
-    m1 = _createMessage 'request', reqId, 'get', true
+    m1 = _createMessage 'http', 'request', reqId, 'get', true
     dynReplyChannel.handleRequest [m1]
     .then () ->
-      m2 = _createMessage 'end', reqId
+      m2 = _createMessage 'http', 'end', reqId
       dynReplyChannel.handleRequest [m2]
     .then () ->
       q.delay(1000)
@@ -261,26 +251,26 @@ describe 'http-message test', ->
     dynRequestChannel.resetSentMesages()
 
     reqId = "#{reqIdCount++}"
-    m1 = _createMessage 'request', reqId, 'post'
+    m1 = _createMessage 'http', 'request', reqId, 'post'
     dynReplyChannel.handleRequest [m1]
     .then () ->
-      m2 = _createMessage 'data', reqId
+      m2 = _createMessage 'http', 'data', reqId
       dynReplyChannel.handleRequest [m2, 'timeout request']
     .then () ->
-      m3 = _createMessage 'end', reqId
+      m3 = _createMessage 'http', 'end', reqId
       dynReplyChannel.handleRequest [m3]
     .fail (err) ->
       done err
 
     setTimeout () ->
       reqId = "#{reqIdCount++}"
-      m1 = _createMessage 'request', reqId, 'post'
+      m1 = _createMessage 'http', 'request', reqId, 'post'
       dynReplyChannel.handleRequest [m1]
       .then () ->
-        m2 = _createMessage 'data', reqId
+        m2 = _createMessage 'http', 'data', reqId
         dynReplyChannel.handleRequest [m2, 'normal request']
       .then () ->
-        m3 = _createMessage 'end', reqId
+        m3 = _createMessage 'http', 'end', reqId
         dynReplyChannel.handleRequest [m3]
       .fail (err) ->
         done err
@@ -296,17 +286,61 @@ describe 'http-message test', ->
     , 1000
 
 
-  _createMessage = (type, reqId, method, use_instancespath) ->
-    if type is 'request'
+  it 'Upgrade current connection to websocket', (done) ->
+    wsServer = new WebSocketServer {
+      httpServer: httpMessageServer
+      autoAccepConnections: false
+      keepalive: true
+    }
+    wsServer.on 'error', (err) -> done err
+    wsServer.on 'connect', (err) -> # do nothing
+    wsServer.on 'request', (request) ->
+      try
+        conn = request.accept()
+        conn.on 'error', (err) -> done err
+        conn.on 'message', (message) -> # do nothing
+      catch err
+        done err
+
+    dynRequestChannel.resetSentMesages()
+    reqId = "#{reqIdCount++}"
+    m1 = _createMessage 'ws', 'upgrade', reqId, 'get', true
+    dynReplyChannel.handleRequest [m1]
+    .then () ->
+      q.delay(100)
+    .then () ->
+      [received, receivedData] = dynRequestChannel.getLastSentMessage()
+      expected = 'HTTP/1.1 101 Switching Protocols\r\n\
+                  upgrade: websocket\r\n\
+                  connection: Upgrade\r\n\
+                  sec-websocket-accept: RYa71pA1xVjMfg1DTxSryaQLpuQ=\r\n\r\n'
+      receivedData.should.be.equal expected
+      done()
+    .fail (err) -> done err
+
+
+  _createMessage = (protocol, type, reqId, method, use_instancespath) ->
+    if protocol is 'http' and type is 'request'
       requestData =
         protocol: 'http'
         url: '/'
         method: method
         headers:
           host:"localhost:8080",
-          connection:"keep-alive"
+          #connection:"keep-alive"
       if use_instancespath? then requestData.headers.instancespath = ''
+    else if protocol is 'ws' and type is 'upgrade'
+      requestData =
+        protocol: 'http'
+        url: '/'
+        method: method
+        headers:
+          Upgrade: 'websocket'
+          Connection: 'Upgrade'
+          'Sec-WebSocket-Version': 13
+          'Sec-WebSocket-Key': 'dntc9kLsb1emoxP6D2VnBA=='
     return JSON.stringify {
+      protocol: protocol
       type: type
       domain: 'uno.empresa.es'
       fromInstance: SEP_IID
@@ -314,3 +348,5 @@ describe 'http-message test', ->
       reqId: reqId
       data: requestData
     }
+
+
