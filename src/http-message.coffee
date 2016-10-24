@@ -148,7 +148,8 @@ class ServerMessage extends http.Server
     dynRequestChannel = @dynChannels[requestMessage.fromInstance].request
     if dynRequestChannel?
 
-      responseMessage = @_createHttpMessage('response', response, requestMessage)
+      responseMessage = @_createHttpMessage('response', response, \
+                                            requestMessage)
       @_sendMessage(dynRequestChannel, responseMessage)
 
       response.on 'data', (chunk) =>
@@ -211,7 +212,8 @@ class ServerMessage extends http.Server
 
       request.on 'error', (err) =>
         @logger.error "#{method} onError #{err.message}"
-        responseMessage = @_createWsMessage('upgrade', connKey, reqId, err.message)
+        responseMessage = @_createWsMessage('upgrade', connKey, reqId, \
+                                            err.message)
         @_sendMessage(dynRequestChannel, responseMessage)
 
       request.on 'response', (response) =>
