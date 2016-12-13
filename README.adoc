@@ -2,7 +2,6 @@
 
 == httpMessage.Server
 
-=== Funcionamiento
 TBD
 
 === Ejemplo de uso con Express
@@ -29,61 +28,39 @@ httpServer.listen sepChannel, (err) => [...]
 
 == httpMessage.request()
 
-=== Funcionamiento
+La función httpMessage.request(options, callback) es equivalente al http.request() de Nodejs.
+La única diferencia es que, en lugar de necesitar host+port en su parámetro 'options', necesita un canal de tipo Request.
+El envío de la petición y su respuesta, se realizan a través del par REQ->REP de las instancias emisora y receptora.
+  Instancia_A+httpMessage.request() --> REQ --> LB --> REP --> httpMessageServer+Instancia_B
+Realmente no se utilizan estos canales estáticos, sino 2 pares de canales dinámicos REQ/REP (que simulan un canal dinámico dúplex -- no lo tenemos implementado, y es lo que necesitaríamos).
 
-httpMessage.request() no va a heredar ni utilizar http.request().
+En options también se puede incluir un objeto httpMessage.Agent, para conseguir que varios peticiones sean sticky respecto a la instancia receptora.
+Este objeto httpMessage.Agent es más simple que su equivalente http.Agent de Node, ya que no tiene que gestionar sockets.
+En este caso, el concepto de "sticky" se refiere al echo de que dos request's realizadas por una instancia A, sean procesadas por la misma instancia de B.
+Un mismo Agent puede utilizarse en varias peticiones Request generadas por A, dirigidas a distintos componentes (el "sticky" será por componente).
 
-Su funcionamiento es éste (siendo A el componente que invoca la petición, y B el que la recibe):
+Devuelve un objeto request de la clase httpMessage.ClientRequest, con "casi" mismo interfaz que el http.ClientRequest proporcionado por Nodejs.
+Hay funcionalidades que no soportamos, como setTimeout() o Abort().
 
-- Al ejecutar httpMessage.request(), se buscará/creará DOS pares de canales dynReq/dynRep, entre las instancia de A y la instancia de B elegida por LB. Si 2 peticiones httpMessage.request() tienen asociada la misma "conexión" (explicado más abajo), entonces usarán los 2 mismos pares de canales dynReq/dynRep (sticky entre instancias). Se puede aprovechar código de sep.coffe._getDynRequest()/_selectFE().
-- La función req = httpMessage.request() debe crear un mensaje "request", que enviará a la instancia B (vía canales dinámicos). B (httpMessage) tiene que ser capaz de construir una petición http.request() de Nodejs, con los datos de dicho mensaje.
-- req.write(datos) debe crear-y-enviar un mensaje "data" a la instancia B. B desempaquetará los datos del mensaje y realizará el req.write(datos) real.
-- req.end() debe crear-y-enviar un mensaje "end" a la instancia B. B realizará el req.end() real.
-- Los mensajes "request","data" y "end" deben ser análogos a los que se crean en httpListener.coffee._createMessage() -- que es como los espera el servidor de httpMessage.
-- B (httpMessage server) creará-y-enviará mensajes de respuesta (de tipos "response", "data", "end" y "error").
-- Si A recibe un mensaje "response", entonces debe ejecutar el callback proporcionado a httpMessage.request(). Si no existe el callback, emitirá el evento "response". En ambos casos (callback y evento "response"), creará un objeto httpMessage.response.
-- Si A recibe un mensaje "data", entonces provocará que el objeto response emita un evento 'data'
-- Si A recibe un mensaje "end", entonces provocará que el objeto response emita un evento 'end'
-- Si A recibe un mensaje "response", entonces debe emitir un evento "error"
-
-
-=== Conexiones
-
-Un programador, al usar el http.request() de Nodejs, puede decidir asociarle:
-
-- agent = false -> cada petición es una nueva conexión.
-- agent = undefined -> cada petición es una nueva conexión si el agente global tiene keepalive=false
-- agent = my_agent -> cada petición es una nueva conexión si my_agent tiene keepalive=false. Si keep-alive=true, entonces todas las peticiones con dicho agente comparte conexión.
-
-En el caso de httpMessage.request(), no existe el concepto de conexión.
-
-   Instancia_A+httpMessage.request() --> REQ --> LB --> REP --> httpMessageServer+Instancia_B
-
-Sin embargo, sí que necesitamos simularla.
-Haya donde un http.request() usaría una misma conexión, entonces httpMessage.request() debe usar una misma instancia del componente B (sticky).
-
-Tenemos 2 opciones:
-
-- Usar el mismo mecanismo (http.Agent) para indicar el comportamiento.
-- Crear un nuevo atributo "stickyInstance" en la configuración de httpMessage.request()
+La petición nos proporciona un objeto response de la clase httpMessage.IncomingMessage, equivalente a la clase http.IncomingMessage de Nodejs.
+Al igual que en Nodejs, es un stream-readable,
 
 
-=== Ejemplo de uso
+Ejemplo de uso:
 
 ----
-myAgent = new http.Agent {keepAlive:true} # Si quiere (puede no usar agente)
+myAgent = new http.Agent() # Si se quiere sticky
 
 dataToSend = JSON.stringify myObject
 
 options = {
-  channel: 'myRequestChannel' # en lugar de host+port
-  path: '/upload',
+  channel: myRequestChannel
   method: 'POST',
-  headers: {
-    'Content-Type': 'application/x-www-form-urlencoded',
-    'Content-Length': myData.length
-  }
+  path: '/upload',
   agent: myAgent  # si quiere (puede no usar agente, o usar el agente global)
+  headers: {
+    'Content-Type': 'application/json'
+  }
 }
 
 req = httpMessage.request options, (res) -> {
