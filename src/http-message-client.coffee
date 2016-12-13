@@ -16,8 +16,6 @@ q = require 'q'
 # - Garbage for DynChannManager.agentsMap
 # - How use with Restler, etc.?
 # - Test when a destination instance dies and agents are reconfigured
-# - Test @_dynChannManager.removeRequest()
-# - Test @_dynChannManager.garbageRequests()
 #
 class ClientRequest extends EventEmitter
 
@@ -61,7 +59,7 @@ class ClientRequest extends EventEmitter
         @_send('request', options)
         resolve()
       .fail (err) =>
-        @logger.error "#{method} #{e.stack}"
+        @logger.error "#{method} #{err.stack}"
         @emit 'error', err
         reject err
 
