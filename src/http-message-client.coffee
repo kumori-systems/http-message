@@ -53,7 +53,7 @@ class ClientRequest extends EventEmitter
       @_response = null
       @_responseSource = null
       @_selectDynRequest()
-      .then (dynRequest) =>
+      .then () =>
         @logger.debug "#{method} dynReply=#{@_dynReply.name}, \
                       dynRequest=#{@_dynRequest.name}"
         @_send('request', options)
@@ -190,9 +190,9 @@ class ClientRequest extends EventEmitter
     else
       throw new Error "Invalid message type=#{type}"
     (if data?
-      dynRequest.sendRequest [JSON.stringify(message), data]
+      @_dynRequest.sendRequest [JSON.stringify(message), data]
     else
-      dynRequest.sendRequest [JSON.stringify(message)])
+      @_dynRequest.sendRequest [JSON.stringify(message)])
     .then () =>
       if callback? then callback()
       if type is 'request' then @_endIsSended = true
