@@ -189,7 +189,10 @@ class ClientRequest extends EventEmitter
         encoding = null
     else
       throw new Error "Invalid message type=#{type}"
-    @_dynRequest.sendRequest [JSON.stringify(message), data]
+    (if data?
+      dynRequest.sendRequest [JSON.stringify(message), data]
+    else
+      dynRequest.sendRequest [JSON.stringify(message)])
     .then () =>
       if callback? then callback()
       if type is 'request' then @_endIsSended = true
