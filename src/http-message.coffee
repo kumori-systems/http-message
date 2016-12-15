@@ -2,7 +2,6 @@ fs = require 'fs'
 http = require 'http'
 url = require 'url'
 extend = require('util')._extend
-ip = require 'ip'
 q = require 'q'
 mkdirp = require 'mkdirp'
 slaputils = require 'slaputils'
@@ -36,7 +35,7 @@ class ServerMessage extends http.Server
     # When local-stamp, uses a tcp-port instead uds
     @tcpPort = @channel.config?.port
     if @tcpPort
-      @logger.info "#{method} using tcp-port #{}{@tcpPort} (local-stamp)"
+      @logger.info "#{method} using tcp-port #{@tcpPort} (local-stamp)"
       super @tcpPort, cb
     else
       @_getUdsPort()
@@ -98,11 +97,12 @@ class ServerMessage extends http.Server
 
   _handleHttpRequest: ([message, data]) =>
     reqId = message.reqId
-    method = "ServerMessage:_handleHttpRequest reqId=#{reqId}"
+    type = message.type
+    method = "ServerMessage:_handleHttpRequest reqId=#{reqId} type=#{type}"
     @logger.debug "#{method}"
     return q.promise (resolve, reject) =>
       try
-        switch message.type
+        switch type
 
           when 'request'
             options = @_getOptionsRequest message.data
@@ -134,7 +134,7 @@ class ServerMessage extends http.Server
             resolve [['ACK']]
 
           else
-            throw new Error "Invalid message type: #{message.type}"
+            throw new Error "Invalid message type: #{type}"
       catch e
         @logger.warn "#{method} catch error = #{e.message}"
         reject(e)
@@ -270,8 +270,18 @@ class ServerMessage extends http.Server
       reqId: requestMessage.reqId
     }
     if type is 'response'
-      message.headers = response.headers
-      message.statusCode = response.statusCode
+      message.data = {}
+      message.data.httpVersionMajor = response.httpVersionMajor
+      message.data.httpVersionMinor = response.httpVersionMinor
+      message.data.httpVersion = response.httpVersion
+      message.data.headers = response.headers
+      message.data.rawHeaders = response.rawHeaders
+      message.data.trailers = response.trailers
+      message.data.rawTrailers = response.rawTrailers
+      message.data.url = response.url
+      message.data.method = response.method
+      message.data.statusCode = response.statusCode
+      message.data.statusMessage = response.statusMessage
     return message
 
 
@@ -303,16 +313,14 @@ class ServerMessage extends http.Server
     if data? then aux.push data
     channel.sendRequest aux
     .fail (err) =>
-      @logger.error "#{method} message.type=#{message.type} \
-                     err = #{err.stack}"
+      @logger.error "#{method} err = #{err.stack}"
 
 
   _getOptionsRequest: (request) ->
     options = {}
-    if @tcpPort? # When local-stamp, uses a tcp-port instead uds
-      options.port = @tcpPort
-    else
-      options.socketPath = @socketPath
+    # When local-stamp, uses a tcp-port instead uds
+    if @tcpPort? then options.port = @tcpPort
+    else options.socketPath = @socketPath
     options.host = 'localhost'
     options.method = request.method
     options.headers = extend({}, request.headers)
@@ -323,7 +331,9 @@ class ServerMessage extends http.Server
     if options.headers.instancespath? # For development debug
       options.headers.instancespath = "#{options.headers.instancespath},\
                                        iid=#{@iid}"
-    options.path = url.parse(request.url).path
+    # request.path is available when request is received from
+    # http-message-client.coffee
+    options.path = request.path || url.parse(request.url).path
     if options.headers['upgrade']?.toLowerCase() is 'websocket' and \
        options.headers['connection']?.toLowerCase() is 'upgrade'
       options.agent = false

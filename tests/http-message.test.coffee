@@ -158,7 +158,7 @@ describe 'http-message test', ->
       r1 = JSON.parse r1
       r1.type.should.be.eql 'response'
       r1.reqId.should.be.eql reqId
-      r1.headers.instancespath.should.be.eql ",iid=#{IID}"
+      r1.data.headers.instancespath.should.be.eql ",iid=#{IID}"
       r2.type.should.be.eql 'data'
       r2.reqId.should.be.eql reqId
       r2data.should.be.eql EXPECTED_REPLY
