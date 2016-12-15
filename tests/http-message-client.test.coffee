@@ -114,13 +114,13 @@ agent = null
 httpserver = null
 logger = null
 
-describe.only 'http-message-client test', ->
+describe 'http-message-client test', ->
 
   before (done) ->
     slaputils.setLoggerOwner 'http-message-client'
     logger = slaputils.getLogger 'http-message-client'
     logger.configure {
-      'console-log' : true
+      'console-log' : false
       'console-level' : 'warn'
       'colorize': true
       'file-log' : false
