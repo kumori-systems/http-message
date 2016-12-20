@@ -1,4 +1,5 @@
 slaputils = require 'slaputils'
+httpNode = require 'http'
 
 ServerMessage   = require './http-message'
 ClientRequest   = require './http-message-client'
@@ -20,5 +21,11 @@ module.exports.createServer = (requestListener) ->
   return new ServerMessage(requestListener)
 
 module.exports.request = (options, cb) ->
-  return new ClientRequest(options, cb)
+  # Allows use httpMessage.request() with options.channel or options.host
+  # If options.channels is not defined, then returns a node-clientRequest
+  # object
+  if options.channel?
+    return new ClientRequest(options, cb)
+  else
+    return httpNode.request(options, cb)
 
