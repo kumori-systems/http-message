@@ -1,7 +1,7 @@
 #-------------------------------------------------------------------------------
 slaputils = require 'slaputils'
 http = require '../src/index'
-#httpnode = require 'http'
+httpNode = require 'http'
 express = require 'express'
 bodyParser = require 'body-parser'
 q = require 'q'
@@ -221,6 +221,16 @@ describe 'http-message-client test', ->
       q.delay(2*EXPIRE_TIME) # Wait slow get ..
       done()
 
+  it 'Use a node-httpRequest (without channel)', (done) ->
+    port = 8085
+    nodeServer = httpNode.createServer (req, res) ->
+      res.end GET_RESPONSE
+    nodeServer.listen port, () ->
+      doGet(port) # We want to use node-clientRequest
+      .then (value) ->
+        value.toString().should.be.eql GET_RESPONSE
+        done()
+
 #-------------------------------------------------------------------------------
 startServer = (staReply) ->
   method = 'startServer'
@@ -267,10 +277,11 @@ doGet = (staRequest1, agent) ->
   logger.silly "#{method}"
   return q.promise (resolve, reject) ->
     opt =
-      channel: staRequest1
       method: 'GET'
       path: '/myget'
       agent: agent
+    if staRequest1.constructor?.name is 'Request' then opt.channel = staRequest1
+    else opt.port = staRequest1 # Use with node-clientRequest
     req = http.request opt, (res) ->
       postData = ''
       logger.silly "#{method} onResponse"
