@@ -19,7 +19,6 @@ class ServerMessage extends http.Server
     method = 'ServerMessage.constructor'
     @logger.info "#{method}"
     @dynChannels = {} # Dictionary of dynamic channels, by Sep-iid
-    @requests = {} # http requests in process
     @requests = {} # http requests in process, by reqId
     @websockets = {} # websocket connections in process, by original reqId
     @currentTimeout = DEFAULT_CHANNEL_TIMEOUT
@@ -124,14 +123,24 @@ class ServerMessage extends http.Server
 
           when 'data'
             request = @requests[reqId]
-            if request? then request.write data, () -> resolve [['ACK']]
-            else throw new Error "Request not found"
+            if request?
+              request.write data, () -> resolve [['ACK']]
+            else
+              # Doesnt generate error if request isnt foumnd in @request
+              # Maybe, the response already has been generated (ticket656)
+              #throw new Error "Request not found"
+              resolve [['ACK']]
 
           when 'end'
             request = @requests[reqId]
-            if request? then request.end()
-            else throw new Error "Request not found"
-            resolve [['ACK']]
+            if request?
+              request.end()
+              resolve [['ACK']]
+            else
+              # Doesnt generate error if request isnt foumnd in @request
+              # Maybe, the response already has been generated (ticket656)
+              #throw new Error "Request not found"
+              resolve [['ACK']]
 
           else
             throw new Error "Invalid message type: #{type}"
@@ -165,6 +174,20 @@ class ServerMessage extends http.Server
         @logger.warn "#{method} onError #{err.stack}"
         if @requests[reqId]? then delete @requests[reqId]
 
+    else
+      @logger.warn "#{method} dynRequestChannel not found for iid = \
+                    #{requestMessage.fromInstance}"
+
+
+  _processHttpResponseError: (requestMessage, err) ->
+    method = 'ServerMessage:_processHttpResponseError'
+    @logger.debug "#{method} #{JSON.stringify requestMessage}"
+    reqId = requestMessage.reqId
+    dynRequestChannel = @dynChannels[requestMessage.fromInstance].request
+    if dynRequestChannel?
+      responseMessage = @_createHttpMessage('error', null, requestMessage)
+      @_sendMessage(dynRequestChannel, responseMessage, err.message)
+      if @requests[reqId]? then delete @requests[reqId]
     else
       @logger.warn "#{method} dynRequestChannel not found for iid = \
                     #{requestMessage.fromInstance}"
@@ -245,20 +268,6 @@ class ServerMessage extends http.Server
               #{requestMessage.fromInstance}"
       @logger.warn "#{method} #{text}"
       reject new Error text
-
-
-  _processHttpResponseError: (requestMessage, err) ->
-    method = 'ServerMessage:_processHttpResponseError'
-    @logger.debug "#{method} #{JSON.stringify requestMessage}"
-    reqId = requestMessage.reqId
-    dynRequestChannel = @dynChannels[requestMessage.fromInstance].request
-    if dynRequestChannel?
-      responseMessage = @_createHttpMessage('error', null, requestMessage)
-      @_sendMessage(dynRequestChannel, responseMessage, err.message)
-      if @requests[reqId]? then delete @requests[reqId]
-    else
-      @logger.warn "#{method} dynRequestChannel not found for iid = \
-                    #{requestMessage.fromInstance}"
 
 
   _createHttpMessage: (type, response, requestMessage) ->
