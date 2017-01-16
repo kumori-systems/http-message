@@ -365,6 +365,29 @@ describe 'http-message test', ->
       done()
 
 
+  it 'Force garbage request collector', (done) ->
+    @timeout(5000)
+    httpMessageServer._startGarbageRequests(1000)
+    httpMessageServer.setTimeout(4000)
+    httpMessageServer.once 'garbageRequests', (numRequests) ->
+      numRequests.should.be.eql 1
+      done()
+    httpMessageServer.once 'request', (req, res) ->
+      setTimeout () ->
+        res.statusCode = 200
+        res.setHeader('content-type', 'text/plain')
+        res.write EXPECTED_REPLY
+        res.end()
+      , 2000 # Force garbage requests
+    dynRequestChannel.resetSentMesages()
+    reqId = "#{reqIdCount++}"
+    m1 = _createMessage 'http', 'request', reqId, 'get', true
+    dynReplyChannel.handleRequest [m1]
+    .then () ->
+      m2 = _createMessage 'http', 'end', reqId
+      dynReplyChannel.handleRequest [m2]
+
+
   _createMessage = (prot, type, reqId, method, use_instancespath, datalength) ->
     if prot is 'http' and type is 'request'
       requestData =

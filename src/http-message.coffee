@@ -8,7 +8,8 @@ slaputils = require 'slaputils'
 
 UDS_PATH = './sockets'
 MAX_UDS = 100
-DEFAULT_CHANNEL_TIMEOUT = 3600000 # 1 hour
+DEFAULT_CHANNEL_TIMEOUT = 60 * 60 * 1000 # 1 hour
+REQUEST_GARBAGE_EXPIRE_TIME = 2 * 60 * 60 * 1000   # 2 hour
 
 
 class ServerMessage extends http.Server
@@ -22,6 +23,7 @@ class ServerMessage extends http.Server
     @requests = {} # http requests in process, by reqId
     @websockets = {} # websocket connections in process, by original reqId
     @currentTimeout = DEFAULT_CHANNEL_TIMEOUT
+    @_startGarbageRequests(REQUEST_GARBAGE_EXPIRE_TIME)
     super requestListener
 
 
@@ -50,6 +52,7 @@ class ServerMessage extends http.Server
   close: (cb) ->
     method = 'ServerMessage.close'
     @logger.info "#{method}"
+    @_stopGarbageRequests()
     @channel.handleRequest = null
     super cb
 
@@ -106,7 +109,7 @@ class ServerMessage extends http.Server
           when 'request'
             options = @_getOptionsRequest message.data
             request = http.request options
-            @requests[reqId] = request
+            @_addRequest(reqId, request)
             request.on 'error', (err) =>
               @logger.warn "#{method} onError #{err.stack}"
               @_processHttpResponseError message, err
@@ -168,11 +171,11 @@ class ServerMessage extends http.Server
       response.on 'end', () =>
         responseMessage = @_createHttpMessage('end', response, requestMessage)
         @_sendMessage(dynRequestChannel, responseMessage)
-        if @requests[reqId]? then delete @requests[reqId]
+        if @requests[reqId]? then @_deleteRequest(reqId)
 
       response.on 'error', (err) =>
         @logger.warn "#{method} onError #{err.stack}"
-        if @requests[reqId]? then delete @requests[reqId]
+        if @requests[reqId]? then @_deleteRequest(reqId)
 
     else
       @logger.warn "#{method} dynRequestChannel not found for iid = \
@@ -187,7 +190,7 @@ class ServerMessage extends http.Server
     if dynRequestChannel?
       responseMessage = @_createHttpMessage('error', null, requestMessage)
       @_sendMessage(dynRequestChannel, responseMessage, err.message)
-      if @requests[reqId]? then delete @requests[reqId]
+      if @requests[reqId]? then @_deleteRequest(reqId)
     else
       @logger.warn "#{method} dynRequestChannel not found for iid = \
                     #{requestMessage.fromInstance}"
@@ -251,7 +254,7 @@ class ServerMessage extends http.Server
         ack = @_createWsUpgradeAck(response)
         @_sendMessage(dynRequestChannel, responseMessage, ack)
         @websockets[reqId] = socket
-        if @requests[reqId]? then delete @requests[reqId]
+        if @requests[reqId]? then @_deleteRequest(reqId)
         socket.on 'data', (chunk) =>
           message = @_createWsMessage('data', connKey, reqId)
           @_sendMessage(dynRequestChannel, message, chunk)
@@ -376,5 +379,41 @@ class ServerMessage extends http.Server
           .fail (err) ->
             reject err
 
+
+  _addRequest: (reqId, request) ->
+    request.timestamp = new Date()
+    @requests[reqId] = request
+
+
+  _deleteRequest: (reqId) ->
+    if @requests[reqId]? then delete @requests[reqId]
+    else @logger.warn "_deleteRequest request #{reqId} not found"
+
+
+  # Periodically, checks if exists "zombie" requests
+  #
+  _garbageRequests: () ->
+    now = new Date()
+    numZombies = 0
+    for reqId, request of @requests
+      elapsed = now - request.timestamp
+      if elapsed > @requestGarbageExpireTime
+        numZombies++
+        delete @requests[reqId]
+    if numZombies > 0
+      @logger.warn "ServerMessage._garbageRequests numZombies=#{numZombies}"
+      @emit 'garbageRequests', numZombies # Used only in unitary tests
+
+
+  _startGarbageRequests: (msec) ->
+    @_stopGarbageRequests()
+    @requestGarbageExpireTime = msec
+    @garbageInterval = setInterval () =>
+      @_garbageRequests()
+    , @requestGarbageExpireTime
+
+
+  _stopGarbageRequests: (msec) ->
+    if @garbageInterval? then clearInterval(@garbageInterval)
 
 module.exports = ServerMessage
