@@ -7,7 +7,7 @@
   "scripts": {
     "clean": "if [ $(find ./ -name \"*.js\" | grep -c -v node_modules) -gt 0 ]; then rm $(find ./ -name \"*.js\" | grep -v node_modules); fi",
     "nyan": "rm -f *.js && node_modules/.bin/mocha --reporter nyan --compilers coffee:coffee-script/register tests/*.test.coffee",
-    "spec": "rm -f *.js && node_modules/.bin/mocha --require coffee-coverage/register-istanbul --compilers coffee:coffee-script/register --reporter spec tests/*.test.coffee && node_modules/.bin/istanbul report text-summary lcov cobertura",
+    "spec": "rm -f *.js && node_modules/.bin/mocha --require coffee-coverage/register-istanbul --compilers coffee:coffee-script/register --reporter spec tests/*.test.coffee && node_modules/.bin/istanbul report text-summary lcov cobertura ",
     "old-spec": "rm -f *.js && node_modules/.bin/mocha --reporter spec --compilers coffee:coffee-script/register tests/*.test.coffee",
     "aws-spec": "rm -f *.js && node_modules/.bin/mocha --reporter spec --compilers coffee:coffee-script/register tests-aws/*.test.coffee",
     "lint": "node_modules/.bin/coffeelint src tests",
@@ -31,7 +31,9 @@
     "mocha": "^2.2.4",
     "should": "^6.0.1",
     "supertest": "^1.1.0",
-    "websocket": "1.0.23"
+    "websocket": "1.0.23",
+    "body-parser": "1.13.2",
+    "express": "4.13.1"
   },
   "engines": {
     "node": "4.2.1"

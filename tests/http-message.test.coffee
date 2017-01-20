@@ -158,7 +158,7 @@ describe 'http-message test', ->
       r1 = JSON.parse r1
       r1.type.should.be.eql 'response'
       r1.reqId.should.be.eql reqId
-      r1.headers.instancespath.should.be.eql ",iid=#{IID}"
+      r1.data.headers.instancespath.should.be.eql ",iid=#{IID}"
       r2.type.should.be.eql 'data'
       r2.reqId.should.be.eql reqId
       r2data.should.be.eql EXPECTED_REPLY
@@ -232,7 +232,7 @@ describe 'http-message test', ->
 
 
   it 'Interleave a correct request and a timeout request', (done) ->
-    httpMessageServer.on 'request', (req, res) ->
+    processRequest = (req, res) ->
       data = ''
       req.on 'data', (chunk) ->
         data += chunk
@@ -246,6 +246,7 @@ describe 'http-message test', ->
           res.setHeader('content-type', 'text/plain')
           res.write EXPECTED_REPLY
           res.end()
+    httpMessageServer.on 'request', processRequest
     httpMessageServer.setTimeout 500
 
     dynRequestChannel.resetSentMesages()
@@ -282,6 +283,7 @@ describe 'http-message test', ->
       next().type.should.be.eql 'data'
       next().type.should.be.eql 'response'
       next().type.should.be.eql 'error'
+      httpMessageServer.removeListener 'request', processRequest
       done()
     , 1000
 
@@ -319,8 +321,75 @@ describe 'http-message test', ->
     .fail (err) -> done err
 
 
-  _createMessage = (protocol, type, reqId, method, use_instancespath) ->
-    if protocol is 'http' and type is 'request'
+  it 'Process a request setting content-lengt (ticket 656)', (done) ->
+    httpMessageServer.once 'request', (req, res) ->
+      data = ''
+      req.on 'data', (chunk) ->
+        data += chunk
+      req.on 'end', () ->
+        data.should.be.eql EXPECTED_PAYLOAD
+        res.statusCode = 200
+        res.setHeader('content-type', 'text/plain')
+        res.write EXPECTED_REPLY
+        res.end()
+    reqId = "#{reqIdCount++}"
+    contentLength = EXPECTED_PAYLOAD.length
+    m1 = _createMessage 'http', 'request', reqId, 'post', false, contentLength
+    dynReplyChannel.handleRequest [m1]
+    .then () ->
+      m2 = _createMessage 'http', 'data', reqId
+      dynReplyChannel.handleRequest [m2, EXPECTED_PAYLOAD]
+    .then () ->
+      # Force ticket656
+      q.delay(250)
+    .then () ->
+      m3 = _createMessage 'http', 'end', reqId
+      dynReplyChannel.handleRequest [m3]
+    .then () ->
+      q.delay(100)
+    .then () ->
+      r3 = dynRequestChannel.getLastSentMessage()
+      r3 = JSON.parse r3
+      [r2, r2data] = dynRequestChannel.getLastSentMessage()
+      r2 = JSON.parse r2
+      r2data = r2data.toString()
+      r1 = dynRequestChannel.getLastSentMessage()
+      r1 = JSON.parse r1
+      r1.type.should.be.eql 'response'
+      r1.reqId.should.be.eql reqId
+      r2.type.should.be.eql 'data'
+      r2.reqId.should.be.eql reqId
+      r2data.should.be.eql EXPECTED_REPLY
+      r3.type.should.be.eql 'end'
+      r3.reqId.should.be.eql reqId
+      done()
+
+
+  it 'Force garbage request collector', (done) ->
+    @timeout(5000)
+    httpMessageServer._startGarbageRequests(1000)
+    httpMessageServer.setTimeout(4000)
+    httpMessageServer.once 'garbageRequests', (numRequests) ->
+      numRequests.should.be.eql 1
+      done()
+    httpMessageServer.once 'request', (req, res) ->
+      setTimeout () ->
+        res.statusCode = 200
+        res.setHeader('content-type', 'text/plain')
+        res.write EXPECTED_REPLY
+        res.end()
+      , 2000 # Force garbage requests
+    dynRequestChannel.resetSentMesages()
+    reqId = "#{reqIdCount++}"
+    m1 = _createMessage 'http', 'request', reqId, 'get', true
+    dynReplyChannel.handleRequest [m1]
+    .then () ->
+      m2 = _createMessage 'http', 'end', reqId
+      dynReplyChannel.handleRequest [m2]
+
+
+  _createMessage = (prot, type, reqId, method, use_instancespath, datalength) ->
+    if prot is 'http' and type is 'request'
       requestData =
         protocol: 'http'
         url: '/'
@@ -329,7 +398,8 @@ describe 'http-message test', ->
           host:"localhost:8080",
           #connection:"keep-alive"
       if use_instancespath? then requestData.headers.instancespath = ''
-    else if protocol is 'ws' and type is 'upgrade'
+      if datalength? then requestData.headers['content-length'] = datalength
+    else if prot is 'ws' and type is 'upgrade'
       requestData =
         protocol: 'http'
         url: '/'
@@ -340,7 +410,7 @@ describe 'http-message test', ->
           'Sec-WebSocket-Version': 13
           'Sec-WebSocket-Key': 'dntc9kLsb1emoxP6D2VnBA=='
     return JSON.stringify {
-      protocol: protocol
+      protocol: prot
       type: type
       domain: 'uno.empresa.es'
       fromInstance: SEP_IID
