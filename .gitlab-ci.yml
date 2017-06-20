@@ -1,4 +1,4 @@
-image: slap_gitlab_node_zmq:latest
+image: registry.gitlab.com/ecloud/ci-runners:latest
 
 test:
   script:
