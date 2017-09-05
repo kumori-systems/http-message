@@ -366,18 +366,15 @@ class ServerMessage extends http.Server
   _getUdsPort: () ->
     self_used_uds = @used_uds
     return q.promise (resolve, reject) ->
-      next = self_used_uds.length+1
-      if next is MAX_UDS then reject new Error "Too many sockets (#{MAX_UDS})"
       mkdirp UDS_PATH, (err) ->
-        if err then reject err
-        else
-          socketPath = UDS_PATH + '/' + next + '.sock'
-          slaputils.deleteFile socketPath
-          .then () ->
-            self_used_uds.push socketPath
-            resolve socketPath
-          .fail (err) ->
-            reject err
+        if err then return reject err
+        next = self_used_uds.length+1
+        if next > MAX_UDS then return reject Error "Too many sockets #{MAX_UDS}"
+        socketPath = UDS_PATH + '/' + next + '.sock'
+        self_used_uds.push socketPath
+        slaputils.deleteFile socketPath
+        .then () -> resolve socketPath
+        .fail (err) -> reject err
 
 
   _addRequest: (reqId, request) ->
