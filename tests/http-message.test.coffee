@@ -388,6 +388,25 @@ describe 'http-message test', ->
       dynReplyChannel.handleRequest [m2]
 
 
+  it 'Several ServerMessage objects instances', (done) ->
+    # Ticket920
+    CONCURRENT_SERVERS = 3
+    servers = []
+    completedListen = 0
+    createServer = () ->
+      server = http.createServer()
+      server.on 'error', (err) -> done err
+      server.repChann = new Reply('main_rep_channel_' + servers.length, IID)
+      servers.push server
+    onListen = () ->
+      completedListen++
+      if completedListen is servers.length
+        server.close() for server in servers
+        done()
+    createServer() for i in [1 .. CONCURRENT_SERVERS]
+    server.listen server.repChann, onListen for server in servers
+
+
   _createMessage = (prot, type, reqId, method, use_instancespath, datalength) ->
     if prot is 'http' and type is 'request'
       requestData =
