@@ -288,19 +288,23 @@ describe 'http-message test', ->
     , 1000
 
 
-  it 'Upgrade current connection to websocket', (done) ->
+  it 'Upgrade current connection to websocket and use it', (done) ->
     wsServer = new WebSocketServer {
       httpServer: httpMessageServer
       autoAccepConnections: false
       keepalive: true
     }
+    wsReceivedMessages = 0
     wsServer.on 'error', (err) -> done err
-    wsServer.on 'connect', (err) -> # do nothing
     wsServer.on 'request', (request) ->
       try
         conn = request.accept()
         conn.on 'error', (err) -> done err
-        conn.on 'message', (message) -> # do nothing
+        conn.on 'message', (message) ->
+          wsReceivedMessages++
+          conn.sendUTF "echo_#{message.utf8Data}"
+          conn.close()
+        conn.on 'close', () -> # do nothing
       catch err
         done err
 
@@ -315,8 +319,49 @@ describe 'http-message test', ->
       expected = 'HTTP/1.1 101 Switching Protocols\r\n\
                   upgrade: websocket\r\n\
                   connection: Upgrade\r\n\
-                  sec-websocket-accept: RYa71pA1xVjMfg1DTxSryaQLpuQ=\r\n\r\n'
+                  sec-websocket-accept: Teu0yrJZBLH0+gJYYr3MPaqqUL8=\r\n\r\n'
       receivedData.should.be.equal expected
+      q.delay(100)
+    # When ...
+    #   Sec-WebSocket-Key = HdBhQ5Lz9JV8S+/7PC3bCw=='
+    #   sec-websocket-accept = Teu0yrJZBLH0+gJYYr3MPaqqUL8=\r\n\r\n'
+    # ... then, the websocket frame for text 'hello', is:
+    #   <Buffer 81 85 40 78 5a 9d 28 1d 36 f1 2f>
+    # (value sniffed from a websocket server)
+    # WsServer responses with 'echo_hello' and close connection (normal
+    # connection closure).
+    # The websocket frame for response 'echo_hello' + close is:
+    #   <Buffer 81 0a 65 63 68 6f 5f 68 65 6c 6c 6f 88 1b 03 e8 4e 6f 72 6d
+    #    61 6c 20 63 6f 6e 6e 65 63 74 69 6f 6e 20 63 6c 6f 73 75 72 65>
+    .then () ->
+      dynRequestChannel.resetSentMesages()
+      m2 = _createMessage 'ws', 'data', reqId
+      helloBuffer = new Buffer([0x81, 0x85, 0x40, 0x78, 0x5a, 0x9d, 0x28, \
+                               0x1d, 0x36, 0xf1, 0x2f])
+      dynReplyChannel.handleRequest [m2, helloBuffer]
+      q.delay(100)
+    .then () ->
+      # We checked that 'echo_hello' + close has arrived
+      [received, receivedData] = dynRequestChannel.getLastSentMessage()
+      echohelloBuffer = new Buffer([0x81, 0x0a, 0x65, 0x63, 0x68, 0x6f, 0x5f, \
+                                    0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x88, 0x1b, \
+                                    0x03, 0xe8, 0x4e, 0x6f, 0x72, 0x6d, 0x61, \
+                                    0x6c, 0x20, 0x63, 0x6f, 0x6e, 0x6e, 0x65, \
+                                    0x63, 0x74, 0x69, 0x6f, 0x6e, 0x20, 0x63, \
+                                    0x6c, 0x6f, 0x73, 0x75, 0x72, 0x65])
+      [received, receivedData] = dynRequestChannel.getLastSentMessage()
+      receivedData.should.eql(echohelloBuffer)
+      wsReceivedMessages.should.eql 1
+    .then () ->
+      # This message will not arrive, since the connection is closed.
+      m3 = _createMessage 'ws', 'data', reqId
+      helloBuffer2 = new Buffer([0x81, 0x85, 0x40, 0x78, 0x5a, 0x9d, 0x28, \
+                                 0x1d, 0x36, 0xf1, 0x2f])
+      dynReplyChannel.handleRequest [m3, helloBuffer2]
+      q.delay(100)
+    .then () ->
+      # We checked that the previous message hasn't arrived.
+      wsReceivedMessages.should.eql 1
       done()
     .fail (err) -> done err
 
@@ -427,7 +472,7 @@ describe 'http-message test', ->
           Upgrade: 'websocket'
           Connection: 'Upgrade'
           'Sec-WebSocket-Version': 13
-          'Sec-WebSocket-Key': 'dntc9kLsb1emoxP6D2VnBA=='
+          'Sec-WebSocket-Key': 'HdBhQ5Lz9JV8S+/7PC3bCw=='
     return JSON.stringify {
       protocol: prot
       type: type

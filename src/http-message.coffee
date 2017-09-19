@@ -129,7 +129,7 @@ class ServerMessage extends http.Server
             if request?
               request.write data, () -> resolve [['ACK']]
             else
-              # Doesnt generate error if request isnt foumnd in @request
+              # Doesnt generate error if request isnt found in @request
               # Maybe, the response already has been generated (ticket656)
               #throw new Error "Request not found"
               resolve [['ACK']]
@@ -140,7 +140,7 @@ class ServerMessage extends http.Server
               request.end()
               resolve [['ACK']]
             else
-              # Doesnt generate error if request isnt foumnd in @request
+              # Doesnt generate error if request isnt found in @request
               # Maybe, the response already has been generated (ticket656)
               #throw new Error "Request not found"
               resolve [['ACK']]
@@ -209,14 +209,24 @@ class ServerMessage extends http.Server
 
           when 'data'
             socket = @websockets[reqId]
-            if not socket? then throw new Error "WS request not found"
-            socket.write data, () -> resolve [['ACK']]
+            if socket?
+              socket.write data, () -> resolve [['ACK']]
+            else
+              # Doesnt generate error if request isnt found in @request
+              # Maybe, the wsconnection already has been closed
+              #throw new Error "WS request not foun"
+              resolve [['ACK']]
 
           when 'end'
             socket = @websockets[reqId]
-            if not socket? then throw new Error "WS request not found"
-            socket.end()
-            resolve [['ACK']]
+            if socket?
+              socket.end()
+              resolve [['ACK']]
+            else
+              # Doesnt generate error if request isnt found in @request
+              # Maybe, the wsconnection already has been closed
+              #throw new Error "WS request not foun"
+              resolve [['ACK']]
 
           else
             throw new Error "Invalid message type: #{message.type}"
