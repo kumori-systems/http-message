@@ -7,6 +7,8 @@ class Agent
 
 
   constructor: () ->
+    if not @logger? # If logger hasn't been injected from outside
+      slaputils.setLogger [Agent]
     @name = slaputils.generateId()
     method = 'Agent.constructor'
     @logger.debug "#{method} name=#{@name}"
@@ -14,7 +16,8 @@ class Agent
 
   destroy: () ->
     # Do nothing ...
-    @logger.debug "#Agent.destroy name=#{@name}"
+    method = 'Agent.destroy'
+    @logger.debug "#{method} name=#{@name}"
 
 
 module.exports = Agent
