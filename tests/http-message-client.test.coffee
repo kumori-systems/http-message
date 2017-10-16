@@ -47,7 +47,6 @@ class Router
         else throw new Error 'Router.send invalid dynamic channel'
 
 
-#-------------------------------------------------------------------------------
 class Channel
   constructor: (@name, iid, @router, config) ->
     @config = {}
@@ -117,11 +116,12 @@ logger = null
 describe 'http-message-client test', ->
 
   before (done) ->
+    slaputils.setLogger [http]
     slaputils.setLoggerOwner 'http-message-client'
     logger = slaputils.getLogger 'http-message-client'
     logger.configure {
       'console-log' : false
-      'console-level' : 'warn'
+      'console-level' : 'debug'
       'colorize': true
       'file-log' : false
       'file-level': 'debug'
@@ -143,15 +143,16 @@ describe 'http-message-client test', ->
     agent = new http.Agent()
     startServer(staReply1)
     .then (value) ->
-      http.getDynChannManager({expireTime: EXPIRE_TIME}) # For test purposes
+      http._getDynChannManager({expireTime: EXPIRE_TIME}) # For test purposes
       httpserver = value
       done()
 
   after (done) ->
-    http.getDynChannManager().close()
+    http._getDynChannManager().close()
     if httpserver? then stopServer(httpserver)
     if agent? then agent.destroy()
     done()
+
 
   it 'Get with agent', (done) ->
     doGet(staRequest1, agent)
@@ -159,11 +160,13 @@ describe 'http-message-client test', ->
       value.toString().should.be.eql GET_RESPONSE
       done()
 
+
   it 'Post with agent', (done) ->
     doPost(staRequest1, agent)
     .then (value) ->
       value.toString().should.be.eql POST_RESPONSE
       done()
+
 
   it 'Get without agent', (done) ->
     doGet(staRequest1)
@@ -171,11 +174,13 @@ describe 'http-message-client test', ->
       value.toString().should.be.eql GET_RESPONSE
       done()
 
+
   it 'Post without agent', (done) ->
     doPost(staRequest1)
     .then (value) ->
       value.toString().should.be.eql POST_RESPONSE
       done()
+
 
   it 'Get+Post simultaneous', (done) ->
     promises = []
@@ -188,6 +193,7 @@ describe 'http-message-client test', ->
       v1 = values[1]
       v1.toString().should.be.eql POST_RESPONSE
       done()
+
 
   it 'Check not implemented functions', (done) ->
     opt =
@@ -212,14 +218,16 @@ describe 'http-message-client test', ->
       setTimeoutFail.should.be.equal true
     done()
 
+
   it 'Slow get', (done) ->
     @timeout 6*EXPIRE_TIME
     reqId = doSlowGet(staRequest1)
     q.delay(2*EXPIRE_TIME)
     .then () ->
-      http.getDynChannManager().checkRequest(reqId).should.be.eql false
+      http._getDynChannManager().checkRequest(reqId).should.be.eql false
       q.delay(2*EXPIRE_TIME) # Wait slow get ..
       done()
+
 
   it 'Use a node-httpRequest (without channel)', (done) ->
     port = 8085
@@ -230,6 +238,7 @@ describe 'http-message-client test', ->
       .then (value) ->
         value.toString().should.be.eql GET_RESPONSE
         done()
+
 
 #-------------------------------------------------------------------------------
 startServer = (staReply) ->

@@ -6,6 +6,9 @@ q = require 'q'
 mkdirp = require 'mkdirp'
 slaputils = require 'slaputils'
 
+ClientRequest = require './http-message-client' # Just to inject logger
+
+
 UDS_PATH = './sockets'
 MAX_UDS = 100
 DEFAULT_CHANNEL_TIMEOUT = 60 * 60 * 1000 # 1 hour
@@ -17,6 +20,8 @@ class ServerMessage extends http.Server
   used_uds: [] # class variable, shared between objects
 
   constructor: (requestListener) ->
+    if not @logger? # If logger hasn't been injected from outside
+      slaputils.setLogger [ServerMessage]
     method = 'ServerMessage.constructor'
     @logger.info "#{method}"
     @dynChannels = {} # Dictionary of dynamic channels, by Sep-iid
@@ -422,5 +427,13 @@ class ServerMessage extends http.Server
 
   _stopGarbageRequests: (msec) ->
     if @garbageInterval? then clearInterval(@garbageInterval)
+
+
+  # This is a method class used to inject a logger to all dependent classes.
+  # This method is used by slaputils/index.coffee/setLogger
+  #
+  @_loggerDependencies: () ->
+    return [ClientRequest]
+
 
 module.exports = ServerMessage
