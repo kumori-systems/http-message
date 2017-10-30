@@ -1,4 +1,5 @@
 Readable = require('stream').Readable
+slaputils = require 'slaputils'
 
 # Slap implementation of http.IncomingMessage.
 #
@@ -10,6 +11,8 @@ class IncomingMessage extends Readable
 
 
   constructor: (options) ->
+    if not @logger? # If logger hasn't been injected from outside
+      slaputils.setLogger [IncomingMessage]
     method = 'IncomingMessage.constructor'
     @logger.debug "#{method}"
     super options

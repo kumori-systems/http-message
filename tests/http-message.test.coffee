@@ -1,5 +1,4 @@
 http = require '../src/index'
-#httpnode = require 'http'
 q = require 'q'
 net = require 'net'
 EventEmitter = require('events').EventEmitter
@@ -72,6 +71,7 @@ describe 'http-message test', ->
 
 
   before (done) ->
+    slaputils.setLogger [http]
     slaputils.setLoggerOwner 'http-message'
     logger = slaputils.getLogger 'http-message'
     logger.configure {
@@ -452,35 +452,33 @@ describe 'http-message test', ->
     server.listen server.repChann, onListen for server in servers
 
 
-  _createMessage = (prot, type, reqId, method, use_instancespath, datalength) ->
-    if prot is 'http' and type is 'request'
-      requestData =
-        protocol: 'http'
-        url: '/'
-        method: method
-        headers:
-          host:"localhost:8080",
-          #connection:"keep-alive"
-      if use_instancespath? then requestData.headers.instancespath = ''
-      if datalength? then requestData.headers['content-length'] = datalength
-    else if prot is 'ws' and type is 'upgrade'
-      requestData =
-        protocol: 'http'
-        url: '/'
-        method: method
-        headers:
-          Upgrade: 'websocket'
-          Connection: 'Upgrade'
-          'Sec-WebSocket-Version': 13
-          'Sec-WebSocket-Key': 'HdBhQ5Lz9JV8S+/7PC3bCw=='
-    return JSON.stringify {
-      protocol: prot
-      type: type
-      domain: 'uno.empresa.es'
-      fromInstance: SEP_IID
-      connKey: CONNKEY
-      reqId: reqId
-      data: requestData
-    }
-
-
+_createMessage = (prot, type, reqId, method, use_instancespath, datalength) ->
+  if prot is 'http' and type is 'request'
+    requestData =
+      protocol: 'http'
+      url: '/'
+      method: method
+      headers:
+        host:"localhost:8080",
+        #connection:"keep-alive"
+    if use_instancespath? then requestData.headers.instancespath = ''
+    if datalength? then requestData.headers['content-length'] = datalength
+  else if prot is 'ws' and type is 'upgrade'
+    requestData =
+      protocol: 'http'
+      url: '/'
+      method: method
+      headers:
+        Upgrade: 'websocket'
+        Connection: 'Upgrade'
+        'Sec-WebSocket-Version': 13
+        'Sec-WebSocket-Key': 'HdBhQ5Lz9JV8S+/7PC3bCw=='
+  return JSON.stringify {
+    protocol: prot
+    type: type
+    domain: 'uno.empresa.es'
+    fromInstance: SEP_IID
+    connKey: CONNKEY
+    reqId: reqId
+    data: requestData
+  }
