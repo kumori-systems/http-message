@@ -139,6 +139,17 @@ class ServerMessage extends http.Server
               #throw new Error "Request not found"
               resolve [['ACK']]
 
+          when 'aborted'
+            request = @requests[reqId]
+            if request?
+              request.abort()
+              resolve [['ACK']]
+            else
+              # Doesnt generate error if request isnt found in @request
+              # Maybe, the response already has been generated (ticket656)
+              #throw new Error "Request not found"
+              resolve [['ACK']]
+
           when 'end'
             request = @requests[reqId]
             if request?
