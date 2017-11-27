@@ -207,6 +207,23 @@ describe 'http-message test', ->
       done()
 
 
+  it 'Process an aborted request with payload', (done) ->
+    httpMessageServer.once 'request', (req, res) ->
+      req.on 'aborted', () ->
+        done()
+      req.on 'end', () ->
+        done new Error 'Aborted expected'
+    reqId = "#{reqIdCount++}"
+    m1 = _createMessage 'http', 'request', reqId, 'post'
+    dynReplyChannel.handleRequest [m1]
+    .then () ->
+      m2 = _createMessage 'http', 'data', reqId
+      dynReplyChannel.handleRequest [m2, EXPECTED_PAYLOAD]
+    .then () ->
+      m3 = _createMessage 'http', 'aborted', reqId
+      dynReplyChannel.handleRequest [m3]
+
+
   it 'Fail a request because timeout', (done) ->
     httpMessageServer.once 'request', (req, res) ->
       q.delay(1000)
