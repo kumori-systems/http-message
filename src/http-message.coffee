@@ -76,7 +76,12 @@ class ServerMessage extends http.Server
         @logger.debug "#{method} request = #{request.toString()}"
         request = JSON.parse request.toString()
         if request.type is 'getDynChannel'
-          if @dynChannels[request.fromInstance]?
+          # Check if dynamic channels are already established with the other
+          # instance.
+          # It is mandatory to check if DynRequestChannel is the same as the one
+          # stored in @dynChannels, to take into account the case that the other
+          # instance is the same... but a new reincarnation.
+          if @dynChannels[request.fromInstance]?.request is dynRequestChannel
             dynReplyChannel = @dynChannels[request.fromInstance].reply
             created = false
           else
