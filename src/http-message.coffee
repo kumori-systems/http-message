@@ -4,7 +4,7 @@ url = require 'url'
 extend = require('util')._extend
 q = require 'q'
 mkdirp = require 'mkdirp'
-slaputils = require 'slaputils'
+klogger = require 'k-logger'
 
 ClientRequest = require './http-message-client' # Just to inject logger
 
@@ -21,7 +21,7 @@ class ServerMessage extends http.Server
 
   constructor: (requestListener) ->
     if not @logger? # If logger hasn't been injected from outside
-      slaputils.setLogger [ServerMessage]
+      klogger.setLogger [ServerMessage]
     method = 'ServerMessage.constructor'
     @logger.info "#{method}"
     @dynChannels = {} # Dictionary of dynamic channels, by Sep-iid
@@ -403,7 +403,7 @@ class ServerMessage extends http.Server
         if next > MAX_UDS then return reject Error "Too many sockets #{MAX_UDS}"
         socketPath = UDS_PATH + '/' + next + '.sock'
         self_used_uds.push socketPath
-        slaputils.deleteFile socketPath
+        _deleteFile socketPath
         .then () -> resolve socketPath
         .fail (err) -> reject err
 
@@ -446,10 +446,20 @@ class ServerMessage extends http.Server
 
 
   # This is a method class used to inject a logger to all dependent classes.
-  # This method is used by slaputils/index.coffee/setLogger
+  # This method is used by klogger/index.coffee/setLogger
   #
   @_loggerDependencies: () ->
     return [ClientRequest]
+
+
+  # Delete a file. Returns a promise
+  #
+  _deleteFile = (filename) ->
+    q.promise (resolve, reject) ->
+      fs.unlink filename, (error) ->
+        if error and not error.code is 'ENOENT'
+          reject new Error('Deleting file: ' + error.message)
+        resolve()
 
 
 module.exports = ServerMessage

@@ -1,8 +1,8 @@
 {
   "name": "http-message",
-  "version": "0.0.1",
-  "description": "httpServer for slap components",
-  "author": "Juanjo Valero <jvalero@iti.es>",
+  "version": "1.0.0",
+  "description": "Kumori Http module",
+  "author": "Kumori Systems",
   "private": true,
   "scripts": {
     "clean": "if [ $(find ./ -name \"*.js\" | grep -c -v node_modules) -gt 0 ]; then rm $(find ./ -name \"*.js\" | grep -v node_modules); fi",
@@ -18,13 +18,13 @@
   },
   "main": "src/index",
   "dependencies": {
-    "coffee-script": "1.10.0",
     "ip": "1.0.2",
     "q": "1.4.1",
     "mkdirp": "0.5.0",
-    "slaputils":"git+ssh://git@gitlab.com:ECloud/slap-utils.git#master"
+    "k-logger":"git+ssh://git@gitlab.com:ECloud/k-logger.git#master"
   },
   "devDependencies": {
+    "coffee-script": "1.10.0",
     "coffee-coverage": "1.0.1",
     "coffeelint": "1.12.1",
     "istanbul": "0.4.2",

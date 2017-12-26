@@ -1,5 +1,5 @@
 #-------------------------------------------------------------------------------
-slaputils = require 'slaputils'
+klogger = require 'k-logger'
 http = require '../src/index'
 httpNode = require 'http'
 express = require 'express'
@@ -113,12 +113,14 @@ agent = null
 httpserver = null
 logger = null
 
+
 describe 'http-message-client test', ->
 
+
   before (done) ->
-    slaputils.setLogger [http]
-    slaputils.setLoggerOwner 'http-message-client'
-    logger = slaputils.getLogger 'http-message-client'
+    klogger.setLogger [http]
+    klogger.setLoggerOwner 'http-message-client'
+    logger = klogger.getLogger 'http-message-client'
     logger.configure {
       'console-log' : false
       'console-level' : 'debug'
@@ -130,7 +132,7 @@ describe 'http-message-client test', ->
       'vm' : ''
       'auto-method': false
     }
-    slaputils.setLogger [Request, Reply, Channel, Router]
+    klogger.setLogger [Request, Reply, Channel, Router]
     router = new Router()
     staRequest1 = new Request(STAREQUEST1_NAME, IID_REQUESTER, router)
     dynRequest1 = new Request(DYNREQUEST1_NAME, IID_REQUESTER, router)
@@ -146,6 +148,7 @@ describe 'http-message-client test', ->
       http._getDynChannManager({expireTime: EXPIRE_TIME}) # For test purposes
       httpserver = value
       done()
+
 
   after (done) ->
     http._getDynChannManager().close()

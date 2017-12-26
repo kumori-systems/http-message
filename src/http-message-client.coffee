@@ -4,7 +4,7 @@ DynChannManager = require('./dynchannel-manager').DynChannManager
 getDynChannManager = require('./dynchannel-manager').getDynChannManager
 IncomingMessage = require './http-message-incoming'
 Agent = require './http-message-agent'
-slaputils = require 'slaputils'
+klogger = require 'k-logger'
 q = require 'q'
 
 
@@ -28,9 +28,9 @@ class ClientRequest extends EventEmitter
   #
   constructor: (options, @cb) ->
     if not @logger? # If logger hasn't been injected from outside
-      slaputils.setLogger [ClientRequest]
+      klogger.setLogger [ClientRequest]
     super()
-    @_reqId = slaputils.generateId()
+    @_reqId = klogger.generateId()
     method = "ClientRequest.constructor reqId=#{@_reqId}"
     @logger.debug "#{method}"
 
@@ -333,7 +333,7 @@ class ClientRequest extends EventEmitter
 
 
   # This is a method class used to inject a logger to all dependent classes.
-  # This method is used by slaputils/index.coffee/setLogger
+  # This method is used by klogger/index.coffee/setLogger
   #
   @_loggerDependencies: () ->
     return [DynChannManager, IncomingMessage, Agent]

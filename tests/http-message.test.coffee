@@ -2,7 +2,7 @@ http = require '../src/index'
 q = require 'q'
 net = require 'net'
 EventEmitter = require('events').EventEmitter
-slaputils = require 'slaputils'
+klogger = require 'k-logger'
 should = require 'should'
 supertest = require 'supertest'
 WebSocketServer = require('websocket').server
@@ -71,12 +71,12 @@ describe 'http-message test', ->
 
 
   before (done) ->
-    slaputils.setLogger [http]
-    slaputils.setLoggerOwner 'http-message'
-    logger = slaputils.getLogger 'http-message'
+    klogger.setLogger [http]
+    klogger.setLoggerOwner 'http-message'
+    logger = klogger.getLogger 'http-message'
     logger.configure {
       'console-log' : false
-      'console-level' : 'debug'
+      'console-level' : 'warn'
       'colorize': true
       'file-log' : false
       'file-level': 'debug'

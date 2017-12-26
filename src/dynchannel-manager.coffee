@@ -1,5 +1,5 @@
 q = require 'q'
-slaputils = require 'slaputils'
+klogger = require 'k-logger'
 
 # Control over which dyn-channels we must use / are using for each http request
 #
@@ -145,7 +145,7 @@ class DynChannManager
 
   constructor: (options) ->
     if not @logger? # If logger hasn't been injected from outside
-      slaputils.setLogger [DynChannManager]
+      klogger.setLogger [DynChannManager]
 
     method = 'DynChannManager.constructor'
     @logger.debug "#{method}"
