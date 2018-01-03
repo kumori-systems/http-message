@@ -369,7 +369,6 @@ describe 'http-message test', ->
       [received, receivedData] = dynRequestChannel.getLastSentMessage()
       receivedData.should.eql(echohelloBuffer)
       wsReceivedMessages.should.eql 1
-    .then () ->
       # This message will not arrive, since the connection is closed.
       m3 = _createMessage 'ws', 'data', reqId
       helloBuffer2 = new Buffer([0x81, 0x85, 0x40, 0x78, 0x5a, 0x9d, 0x28, \

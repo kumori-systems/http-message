@@ -1,4 +1,4 @@
-image: registry.gitlab.com/ecloud/ci-runners:latest
+image: registry.gitlab.com/ecloud/ci-runners/native:2_0_0
 
 test:
   script:
