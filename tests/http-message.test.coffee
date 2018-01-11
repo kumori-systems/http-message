@@ -2,7 +2,7 @@ http = require '../src/index'
 q = require 'q'
 net = require 'net'
 EventEmitter = require('events').EventEmitter
-slaputils = require 'slaputils'
+klogger = require 'k-logger'
 should = require 'should'
 supertest = require 'supertest'
 WebSocketServer = require('websocket').server
@@ -71,12 +71,12 @@ describe 'http-message test', ->
 
 
   before (done) ->
-    slaputils.setLogger [http]
-    slaputils.setLoggerOwner 'http-message'
-    logger = slaputils.getLogger 'http-message'
+    klogger.setLogger [http]
+    klogger.setLoggerOwner 'http-message'
+    logger = klogger.getLogger 'http-message'
     logger.configure {
       'console-log' : false
-      'console-level' : 'debug'
+      'console-level' : 'warn'
       'colorize': true
       'file-log' : false
       'file-level': 'debug'
@@ -369,7 +369,6 @@ describe 'http-message test', ->
       [received, receivedData] = dynRequestChannel.getLastSentMessage()
       receivedData.should.eql(echohelloBuffer)
       wsReceivedMessages.should.eql 1
-    .then () ->
       # This message will not arrive, since the connection is closed.
       m3 = _createMessage 'ws', 'data', reqId
       helloBuffer2 = new Buffer([0x81, 0x85, 0x40, 0x78, 0x5a, 0x9d, 0x28, \
