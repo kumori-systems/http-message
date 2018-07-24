@@ -45,5 +45,11 @@
   },
   "os": [
     "linux"
-  ]
+  ],
+  "release": {
+    "extends": "semantic-release-shared-config",
+    "noCi": false,
+    "dryRun": false,
+    "npmPublish": true
+  }
 }
