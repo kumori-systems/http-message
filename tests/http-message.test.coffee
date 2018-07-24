@@ -114,9 +114,10 @@ describe 'http-message test', ->
       done new Error 'Expected <invalid request type> error'
     .fail (err) ->
       done()
+    undefined
 
 
-  it 'Establish dynamic channel', (done) ->
+  it 'Establish dynamic channel', () ->
     request = JSON.stringify {
       type: 'getDynChannel'
       fromInstance: SEP_IID
@@ -128,12 +129,9 @@ describe 'http-message test', ->
       dynReplyChannel = message[1][0]
       dynReplyChannel.constructor.name.should.be.eql 'Reply'
       dynReplyChannel.name.should.be.eql 'dyn_rep_0'
-      done()
-    .fail (err) ->
-      done err
 
 
-  it 'Process a request', (done) ->
+  it 'Process a request', () ->
     httpMessageServer.once 'request', (req, res) ->
       res.statusCode = 200
       res.setHeader('content-type', 'text/plain')
@@ -164,10 +162,9 @@ describe 'http-message test', ->
       r2data.should.be.eql EXPECTED_REPLY
       r3.type.should.be.eql 'end'
       r3.reqId.should.be.eql reqId
-      done()
 
 
-  it 'Process a request with payload', (done) ->
+  it 'Process a request with payload', () ->
     httpMessageServer.once 'request', (req, res) ->
       data = ''
       req.on 'data', (chunk) ->
@@ -204,7 +201,6 @@ describe 'http-message test', ->
       r2data.should.be.eql EXPECTED_REPLY
       r3.type.should.be.eql 'end'
       r3.reqId.should.be.eql reqId
-      done()
 
 
   it 'Process an aborted request with payload', (done) ->
@@ -222,9 +218,10 @@ describe 'http-message test', ->
     .then () ->
       m3 = _createMessage 'http', 'aborted', reqId
       dynReplyChannel.handleRequest [m3]
+    undefined
 
 
-  it 'Fail a request because timeout', (done) ->
+  it 'Fail a request because timeout', () ->
     httpMessageServer.once 'request', (req, res) ->
       q.delay(1000)
       .then () ->
@@ -245,7 +242,6 @@ describe 'http-message test', ->
     .then () ->
       last = dynRequestChannel.getLastSentMessage()[0]
       JSON.parse(last).type.should.be.eql 'error'
-      done()
 
 
   it 'Interleave a correct request and a timeout request', (done) ->
@@ -380,9 +376,10 @@ describe 'http-message test', ->
       wsReceivedMessages.should.eql 1
       done()
     .fail (err) -> done err
+    undefined
 
 
-  it 'Process a request setting content-lengt (ticket 656)', (done) ->
+  it 'Process a request setting content-lengt (ticket 656)', () ->
     httpMessageServer.once 'request', (req, res) ->
       data = ''
       req.on 'data', (chunk) ->
@@ -423,7 +420,6 @@ describe 'http-message test', ->
       r2data.should.be.eql EXPECTED_REPLY
       r3.type.should.be.eql 'end'
       r3.reqId.should.be.eql reqId
-      done()
 
 
   it 'Force garbage request collector', (done) ->
@@ -447,6 +443,7 @@ describe 'http-message test', ->
     .then () ->
       m2 = _createMessage 'http', 'end', reqId
       dynReplyChannel.handleRequest [m2]
+    undefined
 
 
   it 'Several ServerMessage objects instances', (done) ->

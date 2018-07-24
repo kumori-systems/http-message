@@ -113,11 +113,10 @@ agent = null
 httpserver = null
 logger = null
 
-
 describe 'http-message-client test', ->
 
 
-  before (done) ->
+  before () ->
     klogger.setLogger [http]
     klogger.setLoggerOwner 'http-message-client'
     logger = klogger.getLogger 'http-message-client'
@@ -147,45 +146,39 @@ describe 'http-message-client test', ->
     .then (value) ->
       http._getDynChannManager({expireTime: EXPIRE_TIME}) # For test purposes
       httpserver = value
-      done()
 
 
-  after (done) ->
+  after () ->
     http._getDynChannManager().close()
     if httpserver? then stopServer(httpserver)
     if agent? then agent.destroy()
-    done()
 
 
-  it 'Get with agent', (done) ->
+  it 'Get with agent', () ->
     doGet(staRequest1, agent)
     .then (value) ->
       value.toString().should.be.eql GET_RESPONSE
-      done()
 
 
-  it 'Post with agent', (done) ->
+  it 'Post with agent', () ->
     doPost(staRequest1, agent)
     .then (value) ->
       value.toString().should.be.eql POST_RESPONSE
-      done()
 
 
-  it 'Get without agent', (done) ->
+  it 'Get without agent', () ->
     doGet(staRequest1)
     .then (value) ->
       value.toString().should.be.eql GET_RESPONSE
-      done()
 
 
-  it 'Post without agent', (done) ->
+  it 'Post without agent', () ->
     doPost(staRequest1)
     .then (value) ->
       value.toString().should.be.eql POST_RESPONSE
-      done()
 
 
-  it 'Get+Post simultaneous', (done) ->
+  it 'Get+Post simultaneous', () ->
     promises = []
     promises.push doGet(staRequest1)
     promises.push doPost(staRequest1)
@@ -195,10 +188,9 @@ describe 'http-message-client test', ->
       v0.toString().should.be.eql GET_RESPONSE
       v1 = values[1]
       v1.toString().should.be.eql POST_RESPONSE
-      done()
 
 
-  it 'Check not implemented functions', (done) ->
+  it 'Check not implemented functions', () ->
     opt =
       channel: staRequest1
       method: 'GET'
@@ -219,17 +211,15 @@ describe 'http-message-client test', ->
       setTimeoutFail = false
     catch e
       setTimeoutFail.should.be.equal true
-    done()
 
 
-  it 'Slow get', (done) ->
+  it 'Slow get', () ->
     @timeout 6*EXPIRE_TIME
     reqId = doSlowGet(staRequest1)
     q.delay(2*EXPIRE_TIME)
     .then () ->
       http._getDynChannManager().checkRequest(reqId).should.be.eql false
       q.delay(2*EXPIRE_TIME) # Wait slow get ..
-      done()
 
 
   it 'Use a node-httpRequest (without channel)', (done) ->
