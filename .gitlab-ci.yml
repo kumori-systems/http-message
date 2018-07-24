@@ -4,7 +4,8 @@ stages:
   - test
   - release
 
-test:
+unit tests:
+  stage: test
   script:
     - npm install
     - npm test
