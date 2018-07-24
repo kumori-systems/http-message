@@ -67,14 +67,14 @@ class Channel
 
 class Request extends Channel
   constructor: (@name, iid, @router, config) ->
-    super
+    super arguments...
   sendRequest: (message, dynchannels) ->
     @logger.silly "Request.sendRequest channel=#{@name}"
     return @router.send @, message, dynchannels
 
 class Reply extends Channel
   constructor: (@name, iid, @router, config) ->
-    super
+    super arguments...
 
 #-------------------------------------------------------------------------------
 IID_REQUESTER = 'A1'
@@ -230,7 +230,7 @@ describe 'http-message-client test', ->
   it 'Use a node-httpRequest (without channel)', (done) ->
     port = 8085
     nodeServer = httpNode.createServer (req, res) ->
-     res.end GET_RESPONSE
+      res.end GET_RESPONSE
     nodeServer.listen port, () ->
       doGet(port) # We want to use node-clientRequest
       .then (value) ->

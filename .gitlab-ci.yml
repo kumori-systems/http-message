@@ -7,7 +7,7 @@ stages:
 test:
   script:
     - npm install
-    - npm run spec
+    - npm test
     - npm run lint
 
 publish:

@@ -6,7 +6,8 @@ q = require 'q'
 mkdirp = require 'mkdirp'
 klogger = require 'k-logger'
 
-ClientRequest = require('./http-message-client').ClientRequest # Just to inject logger
+# Just to inject logger
+ClientRequest = require('./http-message-client').ClientRequest
 
 
 UDS_PATH = './sockets'

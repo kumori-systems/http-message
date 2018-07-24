@@ -59,6 +59,6 @@ exports.test = function * (task) {
 }
 
 exports.lint = function * (task) {
-  yield task.source('./{src,tests}/**/*.ts')
+  yield task.source('./{src,tests}/**/*.coffee')
     .shell('coffeelint $glob')
 }
