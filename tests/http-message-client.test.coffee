@@ -204,6 +204,9 @@ describe 'http-message-client test', ->
       method: 'GET'
       path: '/myget'
     req = http.request opt, (res) ->
+      res.on 'data', () -> # Do nothing
+      res.on 'end', () -> done()
+      res.on 'error', (err) -> done err
     req.flushHeaders()
     req.setNoDelay()
     req.setSocketKeepAlive()
@@ -219,7 +222,7 @@ describe 'http-message-client test', ->
       setTimeoutFail = false
     catch e
       setTimeoutFail.should.be.equal true
-    done()
+    req.end()
 
 
   it 'Slow get', (done) ->
