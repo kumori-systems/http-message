@@ -1,9 +1,7 @@
 {
-  "name": "http-message",
+  "name": "@kumori/http-message",
   "version": "1.0.0",
-  "description": "Kumori Http module",
-  "author": "Kumori Systems",
-  "private": true,
+  "description": "HTTP server for Kumori platform",
   "scripts": {
     "build": "taskr build",
     "clean": "taskr clean",
@@ -12,9 +10,13 @@
     "test": "taskr test"
   },
   "main": "lib/index",
+  "types": "types/index.d.ts",
+  "author": "Kumori Systems <info@kumori.systems>",
+  "licentse": "MIT",
+  "repository": "github:kumori-systems/http-message",
   "dependencies": {
     "@types/node": "^10.5.2",
-    "debug": "^3.1.0",
+    "@types/q": "^1.5.0",
     "ip": "^1.1.5",
     "k-logger": "git+ssh://git@gitlab.com:ECloud/k-logger.git#master",
     "mkdirp": "^0.5.1",
@@ -31,6 +33,8 @@
     "express": "^4.16.3",
     "istanbul": "^0.4.5",
     "mocha": "^5.2.0",
+    "semantic-release": "^15.8.1",
+    "semantic-release-shared-config": "gitlab:kumori/semantic-release-shared-config",
     "should": "^13.2.1",
     "supertest": "^3.1.0",
     "taskr": "^1.1.0",

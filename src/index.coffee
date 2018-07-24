@@ -1,9 +1,9 @@
 httpNode = require 'http'
 
-ServerMessage   = require './http-message'
-ClientRequest   = require './http-message-client'
-Agent           = require './http-message-agent'
-IncomingMessage = require './http-message-incoming'
+ServerMessage   = require('./http-message').ServerMessage
+ClientRequest   = require('./http-message-client').ClientRequest
+Agent           = require('./http-message-agent').Agent
+IncomingMessage = require('./http-message-incoming').IncomingMessage
 getDynChannManager = require('./dynchannel-manager').getDynChannManager
 
 module.exports = ServerMessage

@@ -6,7 +6,7 @@ q = require 'q'
 mkdirp = require 'mkdirp'
 klogger = require 'k-logger'
 
-ClientRequest = require './http-message-client' # Just to inject logger
+ClientRequest = require('./http-message-client').ClientRequest # Just to inject logger
 
 
 UDS_PATH = './sockets'
@@ -462,4 +462,4 @@ class ServerMessage extends http.Server
         resolve()
 
 
-module.exports = ServerMessage
+module.exports.ServerMessage = ServerMessage

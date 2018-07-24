@@ -90,4 +90,4 @@ class IncomingMessage extends Readable
     if @_source.readStart? then @_source.readStart()
 
 
-module.exports = IncomingMessage
+module.exports.IncomingMessage = IncomingMessage

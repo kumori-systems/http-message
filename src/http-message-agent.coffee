@@ -20,4 +20,4 @@ class Agent
     @logger.debug "#{method} name=#{@name}"
 
 
-module.exports = Agent
+module.exports.Agent = Agent

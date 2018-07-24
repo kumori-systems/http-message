@@ -6,6 +6,7 @@ express = require 'express'
 bodyParser = require 'body-parser'
 q = require 'q'
 should = require 'should'
+fs = require 'fs'
 
 #-------------------------------------------------------------------------------
 class Router
@@ -190,12 +191,15 @@ describe 'http-message-client test', ->
       v1.toString().should.be.eql POST_RESPONSE
 
 
-  it 'Check not implemented functions', () ->
+  it 'Check not implemented functions', (done) ->
     opt =
       channel: staRequest1
       method: 'GET'
       path: '/myget'
     req = http.request opt, (res) ->
+      res.on 'data', () -> # Do nothing
+      res.on 'end', () -> done()
+      res.on 'error', (err) -> done err
     req.flushHeaders()
     req.setNoDelay()
     req.setSocketKeepAlive()
@@ -211,6 +215,7 @@ describe 'http-message-client test', ->
       setTimeoutFail = false
     catch e
       setTimeoutFail.should.be.equal true
+    req.end()
 
 
   it 'Slow get', () ->
@@ -225,12 +230,15 @@ describe 'http-message-client test', ->
   it 'Use a node-httpRequest (without channel)', (done) ->
     port = 8085
     nodeServer = httpNode.createServer (req, res) ->
-      res.end GET_RESPONSE
+     res.end GET_RESPONSE
     nodeServer.listen port, () ->
       doGet(port) # We want to use node-clientRequest
       .then (value) ->
         value.toString().should.be.eql GET_RESPONSE
+        nodeServer.close()
         done()
+      .fail (error) ->
+        done(error)
 
 
 #-------------------------------------------------------------------------------
