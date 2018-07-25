@@ -4,10 +4,12 @@ stages:
   - test
   - release
 
+before_script:
+  - npm install
+
 unit tests:
   stage: test
   script:
-    - npm install
     - npm test
     - npm run lint
 
