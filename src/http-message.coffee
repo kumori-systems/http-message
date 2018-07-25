@@ -4,7 +4,8 @@ url = require 'url'
 extend = require('util')._extend
 q = require 'q'
 mkdirp = require 'mkdirp'
-klogger = require 'k-logger'
+debug = require 'debug'
+kutil = require './util'
 
 # Just to inject logger
 ClientRequest = require('./http-message-client').ClientRequest
@@ -21,8 +22,7 @@ class ServerMessage extends http.Server
   used_uds: [] # class variable, shared between objects
 
   constructor: (requestListener) ->
-    if not @logger? # If logger hasn't been injected from outside
-      klogger.setLogger [ServerMessage]
+    @logger ?= kutil.getLogger()
     method = 'ServerMessage.constructor'
     @logger.info "#{method}"
     @dynChannels = {} # Dictionary of dynamic channels, by Sep-iid
@@ -449,8 +449,8 @@ class ServerMessage extends http.Server
   # This is a method class used to inject a logger to all dependent classes.
   # This method is used by klogger/index.coffee/setLogger
   #
-  @_loggerDependencies: () ->
-    return [ClientRequest]
+  # @_loggerDependencies: () ->
+  #   return [ClientRequest]
 
 
   # Delete a file. Returns a promise

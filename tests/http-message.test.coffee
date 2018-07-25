@@ -2,11 +2,22 @@ http = require '../src/index'
 q = require 'q'
 net = require 'net'
 EventEmitter = require('events').EventEmitter
-klogger = require 'k-logger'
 should = require 'should'
 supertest = require 'supertest'
 WebSocketServer = require('websocket').server
 
+#### START: ENABLE LOG LINES FOR DEBUGGING ####
+# This will show all log lines in the code if the test are executed with
+# DEBUG="kumori:*" set in the environment. For example, running:
+#
+# $ DEBUG="kumori:*" npm test
+#
+debug = require 'debug'
+# debug.enable 'kumori:*'
+# debug.enable 'kumori:info, kumori:debug'
+debug.log = () ->
+  console.log arguments...
+#### END: ENABLE LOG LINES FOR DEBUGGING ####
 
 #-------------------------------------------------------------------------------
 class Reply extends EventEmitter
@@ -53,7 +64,6 @@ class Request extends EventEmitter
 
 #-------------------------------------------------------------------------------
 
-logger = null
 httpMessageServer = null
 wsServer = null
 replyChannel = null
@@ -71,20 +81,6 @@ describe 'http-message test', ->
 
 
   before (done) ->
-    klogger.setLogger [http]
-    klogger.setLoggerOwner 'http-message'
-    logger = klogger.getLogger 'http-message'
-    logger.configure {
-      'console-log' : false
-      'console-level' : 'warn'
-      'colorize': true
-      'file-log' : false
-      'file-level': 'debug'
-      'file-filename' : 'slap.log'
-      'http-log' : false
-      'vm' : ''
-      'auto-method': false
-    }
     httpMessageServer = http.createServer()
     httpMessageServer.on 'error', (err) ->
       @logger.warn "httpMessageServer.on error = #{err.message}"

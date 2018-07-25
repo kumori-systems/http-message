@@ -1,12 +1,27 @@
 #-------------------------------------------------------------------------------
-klogger = require 'k-logger'
 http = require '../src/index'
+kutil = require '../src/util'
 httpNode = require 'http'
 express = require 'express'
 bodyParser = require 'body-parser'
 q = require 'q'
 should = require 'should'
 fs = require 'fs'
+#-------------------------------------------------------------------------------
+
+#### START: ENABLE LOG LINES FOR DEBUGGING ####
+# This will show all log lines in the code if the test are executed with
+# DEBUG="kumori:*" set in the environment. For example, running:
+#
+# $ DEBUG="kumori:*" npm test
+#
+debug = require 'debug'
+# debug.enable 'kumori:*'
+# debug.enable 'kumori:info, kumori:debug'
+debug.log = () ->
+  console.log arguments...
+logger = kutil.getLogger()
+#### END: ENABLE LOG LINES FOR DEBUGGING ####
 
 #-------------------------------------------------------------------------------
 class Router
@@ -15,7 +30,7 @@ class Router
   addChannels: (channels) ->
     @channels[channel.name] = channel for channel in channels
   getDynChannel: (staChannel) ->
-    @logger.silly "Router.getDynChannel #{staChannel.name}"
+    logger.silly "Router.getDynChannel #{staChannel.name}"
     if staChannel.name is STAREQUEST1_NAME
       return @channels[DYNREPLY2_NAME]
     else if staChannel.name is STAREPLY1_NAME
@@ -31,7 +46,7 @@ class Router
         when DYNREQUEST2_NAME then dstChannel = @channels[DYNREPLY2_NAME]
         else throw new Error 'Router.send invalid channel'
       @_changeChannels(dynchannels)
-      @logger.silly "Router.send #{srcChannel.name} --> #{dstChannel.name}"
+      logger.silly "Router.send #{srcChannel.name} --> #{dstChannel.name}"
       dstChannel.handleRequest message, dynchannels
       .then (result) =>
         @_changeChannels(result[1])
@@ -69,7 +84,7 @@ class Request extends Channel
   constructor: (@name, iid, @router, config) ->
     super arguments...
   sendRequest: (message, dynchannels) ->
-    @logger.silly "Request.sendRequest channel=#{@name}"
+    logger.silly "Request.sendRequest channel=#{@name}"
     return @router.send @, message, dynchannels
 
 class Reply extends Channel
@@ -112,27 +127,11 @@ dynReply1 = null
 dynRequest2 = null
 agent = null
 httpserver = null
-logger = null
 
 describe 'http-message-client test', ->
 
 
   before () ->
-    klogger.setLogger [http]
-    klogger.setLoggerOwner 'http-message-client'
-    logger = klogger.getLogger 'http-message-client'
-    logger.configure {
-      'console-log' : false
-      'console-level' : 'debug'
-      'colorize': true
-      'file-log' : false
-      'file-level': 'debug'
-      'file-filename' : 'slap.log'
-      'http-log' : false
-      'vm' : ''
-      'auto-method': false
-    }
-    klogger.setLogger [Request, Reply, Channel, Router]
     router = new Router()
     staRequest1 = new Request(STAREQUEST1_NAME, IID_REQUESTER, router)
     dynRequest1 = new Request(DYNREQUEST1_NAME, IID_REQUESTER, router)

@@ -1,5 +1,5 @@
 Readable = require('stream').Readable
-klogger = require 'k-logger'
+kutil = require './util'
 
 # Slap implementation of http.IncomingMessage.
 #
@@ -11,8 +11,7 @@ class IncomingMessage extends Readable
 
 
   constructor: (options) ->
-    if not @logger? # If logger hasn't been injected from outside
-      klogger.setLogger [IncomingMessage]
+    @logger ?= kutil.getLogger()
     method = 'IncomingMessage.constructor'
     @logger.debug "#{method}"
     super options

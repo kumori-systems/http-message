@@ -4,8 +4,8 @@ DynChannManager = require('./dynchannel-manager').DynChannManager
 getDynChannManager = require('./dynchannel-manager').getDynChannManager
 IncomingMessage = require('./http-message-incoming').IncomingMessage
 Agent = require('./http-message-agent').Agent
-klogger = require 'k-logger'
 q = require 'q'
+kutil = require './util'
 
 
 # Slap implementation of http.ClientRequest
@@ -27,10 +27,9 @@ class ClientRequest extends EventEmitter
   # Initiates asynchronous operations.
   #
   constructor: (options, @cb) ->
-    if not @logger? # If logger hasn't been injected from outside
-      klogger.setLogger [ClientRequest]
+    @logger ?= kutil.getLogger()
     super()
-    @_reqId = klogger.generateId()
+    @_reqId = kutil.generateId()
     method = "ClientRequest.constructor reqId=#{@_reqId}"
     @logger.debug "#{method}"
 
@@ -335,7 +334,7 @@ class ClientRequest extends EventEmitter
   # This is a method class used to inject a logger to all dependent classes.
   # This method is used by klogger/index.coffee/setLogger
   #
-  @_loggerDependencies: () ->
-    return [DynChannManager, IncomingMessage, Agent]
+  # @_loggerDependencies: () ->
+  #   return [DynChannManager, IncomingMessage, Agent]
 
 module.exports.ClientRequest = ClientRequest
