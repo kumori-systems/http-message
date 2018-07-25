@@ -449,8 +449,8 @@ class ServerMessage extends http.Server
   # This is a method class used to inject a logger to all dependent classes.
   # This method is used by klogger/index.coffee/setLogger
   #
-  # @_loggerDependencies: () ->
-  #   return [ClientRequest]
+  @_loggerDependencies: () ->
+    return [ClientRequest]
 
 
   # Delete a file. Returns a promise

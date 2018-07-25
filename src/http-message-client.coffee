@@ -334,7 +334,7 @@ class ClientRequest extends EventEmitter
   # This is a method class used to inject a logger to all dependent classes.
   # This method is used by klogger/index.coffee/setLogger
   #
-  # @_loggerDependencies: () ->
-  #   return [DynChannManager, IncomingMessage, Agent]
+  @_loggerDependencies: () ->
+    return [DynChannManager, IncomingMessage, Agent]
 
 module.exports.ClientRequest = ClientRequest
