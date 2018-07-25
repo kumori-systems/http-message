@@ -59,6 +59,10 @@ exports.test = function * (task) {
 }
 
 exports.lint = function * (task) {
-  yield task.source('./{src,tests}/**/*.coffee')
-    .shell('coffeelint $glob')
+  yield task.source('src tests')
+    .shell({
+      cmd: 'coffeelint $glob',
+      preferLocal: true,
+      glob: true
+    })
 }
