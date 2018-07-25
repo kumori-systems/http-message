@@ -28,26 +28,12 @@ exports.mrproper = function * (task) {
   yield task.clear(['node_modules'])
 }
 
-// exports.build = function * (task) {
-//   let tsopts = getJSON('./tsconfig.json')
-//     ;
-
-//   yield task.source('src/**/*.ts')
-//     .typescript(tsopts)
-//     .target('lib')
-// }
-
 exports.build = function * (task) {
   let coffeeops = getJSON('./coffeeconfig.json');
   yield task.source('src/**/*.coffee')
     .coffee(coffeeops)
     .target('lib')
 }
-
-// exports.test = function * (task) {
-//   let tsopts = getJSON('./jest.json')
-//   yield task.jest(tsopts)
-// }
 
 exports.test = function * (task) {
   yield task.source("./tests/**/*.test.coffee")
