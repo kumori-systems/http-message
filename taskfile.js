@@ -30,7 +30,8 @@ exports.mrproper = function * (task) {
 
 exports.build = function * (task) {
   let coffeeops = getJSON('./coffeeconfig.json');
-  yield task.source('src/**/*.coffee')
+  yield task.serial(['superclean'])
+    .source('src/**/*.coffee')
     .coffee(coffeeops)
     .target('lib')
 }
