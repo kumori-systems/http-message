@@ -1,0 +1,9 @@
+/node_modules
+/coverage
+/sockets
+/slap.log
+/src
+/tests
+/taskfile.js
+/coffeeconfig.json
+/.gitlab-ci.yml

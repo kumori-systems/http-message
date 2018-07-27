@@ -2,10 +2,10 @@ EventEmitter = require('events').EventEmitter
 extend = require('util')._extend
 DynChannManager = require('./dynchannel-manager').DynChannManager
 getDynChannManager = require('./dynchannel-manager').getDynChannManager
-IncomingMessage = require './http-message-incoming'
-Agent = require './http-message-agent'
-klogger = require 'k-logger'
+IncomingMessage = require('./http-message-incoming').IncomingMessage
+Agent = require('./http-message-agent').Agent
 q = require 'q'
+kutil = require './util'
 
 
 # Slap implementation of http.ClientRequest
@@ -27,10 +27,9 @@ class ClientRequest extends EventEmitter
   # Initiates asynchronous operations.
   #
   constructor: (options, @cb) ->
-    if not @logger? # If logger hasn't been injected from outside
-      klogger.setLogger [ClientRequest]
+    @logger ?= kutil.getLogger()
     super()
-    @_reqId = klogger.generateId()
+    @_reqId = kutil.generateId()
     method = "ClientRequest.constructor reqId=#{@_reqId}"
     @logger.debug "#{method}"
 
@@ -46,7 +45,7 @@ class ClientRequest extends EventEmitter
     @_dynReply = @_dynChannManager.getDynReply(@_staRequest)
 
     # This flag will be 'true' when request finishes (@end() has been invoked)
-    @_endIsSended = false
+    @_endIsSent = false
 
     # This promise works as a semaphore: doesn't permit send messages before
     # obtain dynamic request channel
@@ -75,7 +74,7 @@ class ClientRequest extends EventEmitter
     @waitingDynRequest
     .then () =>
       if not @_dynRequest? then throw new Error 'DynRequest is null'
-      if @_endIsSended then throw new Error 'Write after end'
+      if @_endIsSent then throw new Error 'Write after end'
       @_send('data', chunk, encoding, callback)
     .fail (err) =>
       @emit 'error', err
@@ -92,7 +91,7 @@ class ClientRequest extends EventEmitter
     @waitingDynRequest
     .then () =>
       if not @_dynRequest? then throw new Error 'DynRequest is null'
-      if @_endIsSended then throw new Error 'End after end'
+      if @_endIsSent then throw new Error 'End after end'
       @_send('end', chunk, encoding, callback)
     .fail (err) =>
       @emit 'error', err
@@ -199,7 +198,7 @@ class ClientRequest extends EventEmitter
       @_dynRequest.sendRequest [JSON.stringify(message)])
     .then () =>
       if callback? then callback()
-      if type is 'request' then @_endIsSended = true
+      if type is 'request' then @_endIsSent = true
     .fail (err) =>
       @logger.error "ClientRequest._send reqId=#{@_reqId} err=#{err.message}"
       @_dynChannManager.removeRequest(@_reqId)
@@ -338,4 +337,4 @@ class ClientRequest extends EventEmitter
   @_loggerDependencies: () ->
     return [DynChannManager, IncomingMessage, Agent]
 
-module.exports = ClientRequest
+module.exports.ClientRequest = ClientRequest

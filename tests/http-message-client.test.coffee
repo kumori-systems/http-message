@@ -1,11 +1,27 @@
 #-------------------------------------------------------------------------------
-klogger = require 'k-logger'
 http = require '../src/index'
+kutil = require '../src/util'
 httpNode = require 'http'
 express = require 'express'
 bodyParser = require 'body-parser'
 q = require 'q'
 should = require 'should'
+fs = require 'fs'
+#-------------------------------------------------------------------------------
+
+#### START: ENABLE LOG LINES FOR DEBUGGING ####
+# This will show all log lines in the code if the test are executed with
+# DEBUG="kumori:*" set in the environment. For example, running:
+#
+# $ DEBUG="kumori:*" npm test
+#
+debug = require 'debug'
+# debug.enable 'kumori:*'
+# debug.enable 'kumori:info, kumori:debug'
+debug.log = () ->
+  console.log arguments...
+logger = kutil.getLogger()
+#### END: ENABLE LOG LINES FOR DEBUGGING ####
 
 #-------------------------------------------------------------------------------
 class Router
@@ -14,7 +30,7 @@ class Router
   addChannels: (channels) ->
     @channels[channel.name] = channel for channel in channels
   getDynChannel: (staChannel) ->
-    @logger.silly "Router.getDynChannel #{staChannel.name}"
+    logger.silly "Router.getDynChannel #{staChannel.name}"
     if staChannel.name is STAREQUEST1_NAME
       return @channels[DYNREPLY2_NAME]
     else if staChannel.name is STAREPLY1_NAME
@@ -30,7 +46,7 @@ class Router
         when DYNREQUEST2_NAME then dstChannel = @channels[DYNREPLY2_NAME]
         else throw new Error 'Router.send invalid channel'
       @_changeChannels(dynchannels)
-      @logger.silly "Router.send #{srcChannel.name} --> #{dstChannel.name}"
+      logger.silly "Router.send #{srcChannel.name} --> #{dstChannel.name}"
       dstChannel.handleRequest message, dynchannels
       .then (result) =>
         @_changeChannels(result[1])
@@ -66,14 +82,14 @@ class Channel
 
 class Request extends Channel
   constructor: (@name, iid, @router, config) ->
-    super
+    super arguments...
   sendRequest: (message, dynchannels) ->
-    @logger.silly "Request.sendRequest channel=#{@name}"
+    logger.silly "Request.sendRequest channel=#{@name}"
     return @router.send @, message, dynchannels
 
 class Reply extends Channel
   constructor: (@name, iid, @router, config) ->
-    super
+    super arguments...
 
 #-------------------------------------------------------------------------------
 IID_REQUESTER = 'A1'
@@ -111,28 +127,11 @@ dynReply1 = null
 dynRequest2 = null
 agent = null
 httpserver = null
-logger = null
-
 
 describe 'http-message-client test', ->
 
 
-  before (done) ->
-    klogger.setLogger [http]
-    klogger.setLoggerOwner 'http-message-client'
-    logger = klogger.getLogger 'http-message-client'
-    logger.configure {
-      'console-log' : false
-      'console-level' : 'debug'
-      'colorize': true
-      'file-log' : false
-      'file-level': 'debug'
-      'file-filename' : 'slap.log'
-      'http-log' : false
-      'vm' : ''
-      'auto-method': false
-    }
-    klogger.setLogger [Request, Reply, Channel, Router]
+  before () ->
     router = new Router()
     staRequest1 = new Request(STAREQUEST1_NAME, IID_REQUESTER, router)
     dynRequest1 = new Request(DYNREQUEST1_NAME, IID_REQUESTER, router)
@@ -147,45 +146,39 @@ describe 'http-message-client test', ->
     .then (value) ->
       http._getDynChannManager({expireTime: EXPIRE_TIME}) # For test purposes
       httpserver = value
-      done()
 
 
-  after (done) ->
+  after () ->
     http._getDynChannManager().close()
     if httpserver? then stopServer(httpserver)
     if agent? then agent.destroy()
-    done()
 
 
-  it 'Get with agent', (done) ->
+  it 'Get with agent', () ->
     doGet(staRequest1, agent)
     .then (value) ->
       value.toString().should.be.eql GET_RESPONSE
-      done()
 
 
-  it 'Post with agent', (done) ->
+  it 'Post with agent', () ->
     doPost(staRequest1, agent)
     .then (value) ->
       value.toString().should.be.eql POST_RESPONSE
-      done()
 
 
-  it 'Get without agent', (done) ->
+  it 'Get without agent', () ->
     doGet(staRequest1)
     .then (value) ->
       value.toString().should.be.eql GET_RESPONSE
-      done()
 
 
-  it 'Post without agent', (done) ->
+  it 'Post without agent', () ->
     doPost(staRequest1)
     .then (value) ->
       value.toString().should.be.eql POST_RESPONSE
-      done()
 
 
-  it 'Get+Post simultaneous', (done) ->
+  it 'Get+Post simultaneous', () ->
     promises = []
     promises.push doGet(staRequest1)
     promises.push doPost(staRequest1)
@@ -195,7 +188,6 @@ describe 'http-message-client test', ->
       v0.toString().should.be.eql GET_RESPONSE
       v1 = values[1]
       v1.toString().should.be.eql POST_RESPONSE
-      done()
 
 
   it 'Check not implemented functions', (done) ->
@@ -225,14 +217,13 @@ describe 'http-message-client test', ->
     req.end()
 
 
-  it 'Slow get', (done) ->
+  it 'Slow get', () ->
     @timeout 6*EXPIRE_TIME
     reqId = doSlowGet(staRequest1)
     q.delay(2*EXPIRE_TIME)
     .then () ->
       http._getDynChannManager().checkRequest(reqId).should.be.eql false
       q.delay(2*EXPIRE_TIME) # Wait slow get ..
-      done()
 
 
   it 'Use a node-httpRequest (without channel)', (done) ->
@@ -243,7 +234,10 @@ describe 'http-message-client test', ->
       doGet(port) # We want to use node-clientRequest
       .then (value) ->
         value.toString().should.be.eql GET_RESPONSE
+        nodeServer.close()
         done()
+      .fail (error) ->
+        done(error)
 
 
 #-------------------------------------------------------------------------------

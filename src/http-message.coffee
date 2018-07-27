@@ -4,9 +4,11 @@ url = require 'url'
 extend = require('util')._extend
 q = require 'q'
 mkdirp = require 'mkdirp'
-klogger = require 'k-logger'
+debug = require 'debug'
+kutil = require './util'
 
-ClientRequest = require './http-message-client' # Just to inject logger
+# Just to inject logger
+ClientRequest = require('./http-message-client').ClientRequest
 
 
 UDS_PATH = './sockets'
@@ -20,8 +22,7 @@ class ServerMessage extends http.Server
   used_uds: [] # class variable, shared between objects
 
   constructor: (requestListener) ->
-    if not @logger? # If logger hasn't been injected from outside
-      klogger.setLogger [ServerMessage]
+    @logger ?= kutil.getLogger()
     method = 'ServerMessage.constructor'
     @logger.info "#{method}"
     @dynChannels = {} # Dictionary of dynamic channels, by Sep-iid
@@ -462,4 +463,4 @@ class ServerMessage extends http.Server
         resolve()
 
 
-module.exports = ServerMessage
+module.exports.ServerMessage = ServerMessage

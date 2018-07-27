@@ -1,5 +1,5 @@
 q = require 'q'
-klogger = require 'k-logger'
+kutil = require './util'
 
 # Control over which dyn-channels we must use / are using for each http request
 #
@@ -144,8 +144,7 @@ DEFAULT_EXPIRE_TIME = 60 * 60 * 1000   # 1 hour
 class DynChannManager
 
   constructor: (options) ->
-    if not @logger? # If logger hasn't been injected from outside
-      klogger.setLogger [DynChannManager]
+    @logger ?= kutil.getLogger()
 
     method = 'DynChannManager.constructor'
     @logger.debug "#{method}"

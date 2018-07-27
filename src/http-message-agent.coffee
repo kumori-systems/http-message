@@ -1,4 +1,4 @@
-klogger = require 'k-logger'
+kutil = require './util'
 
 # Slap implementation of http.Agent.
 # Just used as 'tag' for sticky-instance control in http-message-client
@@ -7,9 +7,8 @@ class Agent
 
 
   constructor: () ->
-    if not @logger? # If logger hasn't been injected from outside
-      klogger.setLogger [Agent]
-    @name = klogger.generateId()
+    @logger ?= kutil.getLogger()
+    @name = kutil.generateId()
     method = 'Agent.constructor'
     @logger.debug "#{method} name=#{@name}"
 
@@ -20,4 +19,4 @@ class Agent
     @logger.debug "#{method} name=#{@name}"
 
 
-module.exports = Agent
+module.exports.Agent = Agent
