@@ -12,7 +12,7 @@
   "main": "lib/index",
   "types": "types/index.d.ts",
   "author": "Kumori Systems <info@kumori.systems>",
-  "licentse": "MIT",
+  "license": "MIT",
   "repository": "github:kumori-systems/http-message",
   "dependencies": {
     "@types/node": "^10.5.2",
