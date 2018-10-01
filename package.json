@@ -1,6 +1,6 @@
 {
   "name": "@kumori/http-message",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "HTTP server for Kumori platform",
   "scripts": {
     "build": "taskr build",
